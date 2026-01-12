@@ -1,28 +1,40 @@
 package com.example.backend.config;
 
+import com.example.backend.repository.UserRepository;
+import com.example.backend.security.JwtAuthenticationFilter;
+import com.example.backend.security.JwtTokenProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 public class SecurityConfig {
 
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http
-            .csrf(csrf -> csrf.disable())
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers(
-                    "/api/ping",
-                    "/api/health",
-                    "/error"
-                ).permitAll()
-                .anyRequest().authenticated()
-            )
-            .formLogin(form -> form.disable())
-            .httpBasic(basic -> basic.disable());
+  @Bean
+  public SecurityFilterChain securityFilterChain(
+      HttpSecurity http,
+      JwtTokenProvider tokenProvider,
+      UserRepository userRepository
+  ) throws Exception {
 
-        return http.build();
-    }
+    JwtAuthenticationFilter jwtFilter =
+        new JwtAuthenticationFilter(tokenProvider, userRepository);
+
+    http
+        .csrf(csrf -> csrf.disable())
+        .sessionManagement(session ->
+            session.sessionCreationPolicy(
+                org.springframework.security.config.http.SessionCreationPolicy.STATELESS
+            )
+        )
+        .authorizeHttpRequests(auth -> auth
+            .requestMatchers("/api/auth/**").permitAll()
+            .anyRequest().authenticated()
+        )
+        .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+
+    return http.build();
+  }
 }

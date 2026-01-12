@@ -1,0 +1,28 @@
+server:
+  port: 8080
+
+jwt:
+  secret: dev_jwt_secret_key_123456_very_secret_and_long_32bytes
+  expiration-ms: 3600000
+spring:
+
+  datasource:
+    url: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: false   # пока отключим, включим позже
+
+  redis:
+    host: redis
+    port: 6379
+
