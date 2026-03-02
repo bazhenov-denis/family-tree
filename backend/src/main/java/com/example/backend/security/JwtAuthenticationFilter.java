@@ -1,7 +1,7 @@
 package com.example.backend.security;
 
-import com.example.backend.entity.User;
-import com.example.backend.repository.UserRepository;
+import com.example.backend.auth.entity.User;
+import com.example.backend.auth.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

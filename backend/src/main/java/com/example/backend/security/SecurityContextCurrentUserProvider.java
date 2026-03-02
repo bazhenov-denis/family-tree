@@ -1,6 +1,6 @@
 package com.example.backend.security;
 
-import com.example.backend.entity.User;
+import com.example.backend.auth.entity.User;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 

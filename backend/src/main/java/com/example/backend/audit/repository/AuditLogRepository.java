@@ -1,0 +1,13 @@
+package com.example.backend.audit.repository;
+
+import com.example.backend.audit.entity.AuditLog;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface AuditLogRepository
+    extends JpaRepository<AuditLog, UUID> {
+
+  List<AuditLog> findAllByTreeIdOrderByCreatedAtDesc(UUID treeId, Pageable pageable);
+}

@@ -10,21 +10,24 @@ services:
       POSTGRES_USER: family
       POSTGRES_PASSWORD: family
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U family -d family_tree"]
-
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - family_network
 
   redis:
     image: redis:7
     container_name: family_redis
     ports:
       - "6379:6379"
+    networks:
+      - family_network
 
   minio:
     image: minio/minio
@@ -38,6 +41,8 @@ services:
       - "9001:9001"
     volumes:
       - minio_data:/data
+    networks:
+      - family_network
 
   backend:
     build:
@@ -48,35 +53,68 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+      minio:
+        condition: service_started
     environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: family_tree
+      POSTGRES_USER: family
+      POSTGRES_PASSWORD: family
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
       JWT_SECRET: dev_jwt_secret_key_123456_very_secret_and_long_32bytes
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: minio123
+      MINIO_BUCKET: family-tree-media
+      # CORS настройки (если нужно)
+      CORS_ALLOWED_ORIGINS: http://localhost,http://localhost:80,http://localhost:5173
+      # Mail (Yandex SMTP)
+      MAIL_USERNAME: denis.bazhenov128@yandex.com
+      MAIL_PASSWORD: rkhrmksmqcipoeso
+      APP_URL: http://localhost
     ports:
       - "8080:8080"
+    networks:
+      - family_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
 
   frontend:
     build:
       context: ./frontend
+      args:
+        - VITE_API_URL=/api  # Используем относительный путь через nginx
     container_name: family_frontend
     depends_on:
       - backend
-    ports:
-      - "5173:80"
+    networks:
+      - family_network
+    # Не публикуем порт напрямую, только через nginx
 
   nginx:
     build:
       context: ./nginx
     container_name: family_nginx
     depends_on:
-      - backend
-      - frontend
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
     ports:
       - "80:80"
+    networks:
+      - family_network
 
 volumes:
   postgres_data:
   minio_data:
+
+networks:
+  family_network:
+    driver: bridge
