@@ -3,7 +3,7 @@ import Modal from '../ui/Modal.jsx';
 import Spinner from '../ui/Spinner.jsx';
 import { createInvite } from '../../api/invites.js';
 
-const ROLE_LABELS = { EDITOR: 'Редактор', VIEWER: 'Читатель' };
+const ROLE_LABELS = { EDITOR: 'Редактор', COMMENTATOR: 'Комментатор', VIEWER: 'Читатель' };
 
 export default function InviteMemberModal({ treeId, onClose }) {
   const [email, setEmail] = useState('');

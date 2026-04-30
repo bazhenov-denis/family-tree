@@ -14,6 +14,8 @@ public interface EventPersonRepository
 
   void deleteAllByEvent(Event event);
 
+  List<EventPerson> findAllByEvent(Event event);
+
   @Query("SELECT ep FROM EventPerson ep JOIN FETCH ep.event e JOIN FETCH ep.person p WHERE e.tree.id = :treeId ORDER BY e.dateFrom ASC NULLS LAST")
   List<EventPerson> findAllByTreeIdWithDetails(@Param("treeId") UUID treeId);
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   Users, ArrowLeft, RefreshCw, UserPlus, MoreHorizontal,
@@ -19,6 +19,7 @@ import BirthdaysWidget from '../components/tree/BirthdaysWidget.jsx';
 import GedcomImportModal from '../components/tree/GedcomImportModal.jsx';
 import StatsModal from '../components/tree/StatsModal.jsx';
 import AuditLogModal from '../components/tree/AuditLogModal.jsx';
+import VersionsPanel from '../components/version/VersionsPanel.jsx';
 import { getTree } from '../api/trees.js';
 import { getTreeGraph } from '../api/graph.js';
 
@@ -33,7 +34,11 @@ function MoreMenu({ items }) {
       if (ref.current && !ref.current.contains(e.target)) setOpen(false);
     };
     document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener('touchend', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchend', handler);
+    };
   }, [open]);
 
   const visible = items.filter(it => it.show !== false);
@@ -80,17 +85,50 @@ export default function TreeDetailPage() {
   const [quickAdd, setQuickAdd]   = useState(null);
 
   const svgRef = useRef(null);
+  const searchRef = useRef(null);
   const [exporting, setExporting]   = useState(false);
   const [relPath, setRelPath]       = useState(false);
   const [importing, setImporting]   = useState(false);
   const [showStats, setShowStats]   = useState(false);
   const [showAudit, setShowAudit]   = useState(false);
+  const [showVersions, setShowVersions] = useState(false);
   const [flyToTarget, setFlyToTarget] = useState(null);
   const [viewMode, setViewMode] = useState('graph');
 
   const canEdit = tree?.role === 'OWNER' || tree?.role === 'EDITOR';
   const isOwner = tree?.role === 'OWNER';
   const hasNodes = graph && graph.nodes.length > 0;
+
+  // ── Keyboard shortcuts ────────────────────────────────────────
+  const handleKeyDown = useCallback((e) => {
+    // Ctrl/Cmd+K → focus search
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      searchRef.current?.focus?.();
+    }
+    // Ctrl/Cmd+N → add person
+    if ((e.ctrlKey || e.metaKey) && e.key === 'n' && canEdit) {
+      e.preventDefault();
+      setAddingPerson(true);
+    }
+    // R → refresh graph (when not in input)
+    if (e.key === 'r' && !e.ctrlKey && !e.metaKey &&
+        !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+      e.preventDefault();
+      loadGraph();
+    }
+    // Escape → close modals/panels
+    if (e.key === 'Escape') {
+      if (selectedNode) setSelectedNode(null);
+      else if (addingPerson) setAddingPerson(false);
+      else if (quickAdd) setQuickAdd(null);
+    }
+  }, [canEdit, selectedNode, addingPerson, quickAdd, loadGraph]);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
 
   async function loadTree() {
     try {
@@ -165,6 +203,13 @@ export default function TreeDetailPage() {
       icon: <Users size={15} />,
       href: `/trees/${treeId}/members`,
     },
+    { sep: true, show: true },
+    {
+      show: true,
+      label: 'Версии',
+      icon: <GitFork size={15} />,
+      onClick: () => setShowVersions(true),
+    },
   ];
 
   return (
@@ -174,16 +219,21 @@ export default function TreeDetailPage() {
         {/* ── Top bar ── */}
         <div className="tree-detail-topbar">
           <div className="tree-detail-topbar-left">
-            <Link to="/trees" className="back-link">
-              <ArrowLeft size={16} /> Деревья
+            <Link to="/trees" className="back-link" aria-label="Назад к списку деревьев">
+              <ArrowLeft size={16} />
             </Link>
             {treeLoading ? (
               <Spinner size={18} />
             ) : (
               <div style={{ minWidth: 0 }}>
-                <h1 className="page-title" style={{ fontSize: 18 }}>{tree?.title}</h1>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <h1 className="page-title" style={{ fontSize: 18, marginBottom: 0 }}>{tree?.title}</h1>
+                  <span className={`role-badge role-${tree?.role?.toLowerCase()}`} style={{ fontSize: 10, padding: '1px 6px' }}>
+                    {tree?.role === 'OWNER' ? 'Владелец' : tree?.role === 'EDITOR' ? 'Редактор' : tree?.role === 'VIEWER' ? 'Читатель' : 'Комментатор'}
+                  </span>
+                </div>
                 {tree?.description && (
-                  <p className="page-subtitle" style={{ marginTop: 1 }}>{tree.description}</p>
+                  <p className="page-subtitle" style={{ marginTop: 2, fontSize: 12 }}>{tree.description}</p>
                 )}
               </div>
             )}
@@ -192,6 +242,7 @@ export default function TreeDetailPage() {
           <div className="tree-detail-topbar-right">
             {hasNodes && (
               <TreeSearch
+                ref={searchRef}
                 nodes={graph.nodes}
                 onSelect={node => {
                   setFlyToTarget({ nodeId: node.id, ts: Date.now() });
@@ -200,35 +251,41 @@ export default function TreeDetailPage() {
               />
             )}
             {hasNodes && (
-              <div className="view-toggle">
+              <div className="view-toggle view-toggle--segmented">
                 <button
-                  className={`icon-btn${viewMode === 'graph' ? ' active' : ''}`}
+                  className={`view-toggle-btn${viewMode === 'graph' ? ' active' : ''}`}
                   onClick={() => setViewMode('graph')}
                   title="Дерево"
+                  aria-label="Вид дерева"
                 >
-                  <Network size={15} />
+                  <Network size={14} />
+                  <span>Древо</span>
                 </button>
                 <button
-                  className={`icon-btn${viewMode === 'fan' ? ' active' : ''}`}
+                  className={`view-toggle-btn${viewMode === 'fan' ? ' active' : ''}`}
                   onClick={() => setViewMode('fan')}
                   title="Радиальный вид"
+                  aria-label="Радиальный вид"
                 >
-                  <PieChart size={15} />
+                  <PieChart size={14} />
+                  <span>Веер</span>
                 </button>
                 <button
-                  className={`icon-btn${viewMode === 'timeline' ? ' active' : ''}`}
+                  className={`view-toggle-btn${viewMode === 'timeline' ? ' active' : ''}`}
                   onClick={() => setViewMode('timeline')}
                   title="Хронология"
+                  aria-label="Хронология"
                 >
-                  <CalendarDays size={15} />
+                  <CalendarDays size={14} />
+                  <span>Хронология</span>
                 </button>
               </div>
             )}
-            <button className="icon-btn" onClick={loadGraph} title="Обновить граф">
+            <button className="icon-btn" onClick={loadGraph} title="Обновить (R)" aria-label="Обновить граф">
               <RefreshCw size={15} />
             </button>
             {canEdit && (
-              <button className="btn btn-primary btn-sm" onClick={() => setAddingPerson(true)}>
+              <button className="btn btn-primary btn-sm" onClick={() => setAddingPerson(true)} aria-label="Добавить человека">
                 <UserPlus size={15} /> Добавить
               </button>
             )}
@@ -314,6 +371,13 @@ export default function TreeDetailPage() {
           treeId={treeId}
           onImported={loadGraph}
           onClose={() => setImporting(false)}
+        />
+      )}
+      {showVersions && (
+        <VersionsPanel
+          treeId={treeId}
+          onClose={() => setShowVersions(false)}
+          onRefresh={loadGraph}
         />
       )}
     </Layout>

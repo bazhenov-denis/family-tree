@@ -65,10 +65,11 @@ export default function RelationshipModal({
   persons,
   onSave,
   onClose,
+  defaultType,
 }) {
   const toast = useToast();
   const [selectedId, setSelectedId] = useState('');
-  const [roleId, setRoleId] = useState('PARENT');
+  const [roleId, setRoleId] = useState(defaultType || 'PARENT');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 

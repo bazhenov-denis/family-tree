@@ -1,12 +1,16 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { Search, X } from 'lucide-react';
 
-export default function TreeSearch({ nodes, onSelect }) {
+const TreeSearch = forwardRef(function TreeSearch({ nodes, onSelect }, ref) {
   const [query, setQuery]       = useState('');
   const [open, setOpen]         = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
   const containerRef            = useRef(null);
   const inputRef                = useRef(null);
+
+  useImperativeHandle(ref, () => ({
+    focus: () => { inputRef.current?.focus(); setOpen(true); }
+  }), []);
 
   const results = useMemo(() => {
     if (!query.trim()) return [];
@@ -72,7 +76,7 @@ export default function TreeSearch({ nodes, onSelect }) {
           onChange={e => { setQuery(e.target.value); setOpen(true); }}
           onFocus={() => query && setOpen(true)}
           onKeyDown={handleKeyDown}
-          placeholder="Найти человека…"
+          placeholder="Найти человека… ⌘K"
           autoComplete="off"
         />
         {query && (
@@ -105,4 +109,6 @@ export default function TreeSearch({ nodes, onSelect }) {
       )}
     </div>
   );
-}
+});
+
+export default TreeSearch;

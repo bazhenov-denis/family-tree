@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Trees } from 'lucide-react';
+import { Trees, Eye, EyeOff, UserPlus } from 'lucide-react';
 import { register, login as loginApi } from '../api/auth.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import Spinner from '../components/ui/Spinner.jsx';
@@ -9,6 +9,7 @@ export default function RegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { login: authLogin } = useAuth();
@@ -32,64 +33,118 @@ export default function RegisterPage() {
     }
   }
 
+  const initials = ((name.trim() || email || '?')[0]).toUpperCase();
+
   return (
     <div className="auth-page">
-      <div className="auth-card">
-        <div className="auth-logo">
-          <Trees size={36} />
-          <h1>Семейное Древо</h1>
+      {/* Left visual panel */}
+      <div className="auth-visual">
+        <div className="auth-visual-content">
+          <div className="auth-visual-icon">
+            <UserPlus size={40} />
+          </div>
+          <h2 className="auth-visual-title">Начните свою<br />семейную историю</h2>
+          <p className="auth-visual-desc">
+            Создайте аккаунт за минуту и сразу приступайте к построению дерева. Это бесплатно.
+          </p>
         </div>
+      </div>
 
-        <h2 className="auth-title">Регистрация</h2>
-
-        <form onSubmit={handleSubmit} className="form">
-          <div className="form-group">
-            <label className="form-label">Имя (необязательно)</label>
-            <input
-              type="text"
-              className="form-input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Иван Иванов"
-              autoFocus
-            />
+      {/* Right form panel */}
+      <div className="auth-form-side">
+        <div className="auth-card">
+          <div className="auth-logo">
+            <Trees size={32} />
+            <h1>Семейное Древо</h1>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Email *</label>
-            <input
-              type="email"
-              className="form-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              required
-            />
+          <h2 className="auth-title">Регистрация</h2>
+          <p className="auth-subtitle">Создайте аккаунт и начните строить семейное дерево</p>
+
+          {/* Avatar preview */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 24 }}>
+            <div style={{
+              width: 48, height: 48, borderRadius: '50%',
+              background: 'var(--clr-primary)', color: '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 20, fontWeight: 600, flexShrink: 0,
+            }}>
+              {initials}
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 500 }}>Ваш аватар</div>
+              <div style={{ fontSize: 12, color: 'var(--clr-muted)' }}>Будет обновляться при вводе имени</div>
+            </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Пароль *</label>
-            <input
-              type="password"
-              className="form-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Минимум 6 символов"
-              required
-              minLength={6}
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="form">
+            <div className="form-group">
+              <label className="form-label">Имя <span style={{ color: 'var(--clr-muted)', fontWeight: 400 }}>(необязательно)</span></label>
+              <input
+                type="text"
+                className="form-input"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Иван Иванов"
+                autoComplete="name"
+                autoFocus
+              />
+            </div>
 
-          {error && <div className="form-error">{error}</div>}
+            <div className="form-group">
+              <label className="form-label">Email</label>
+              <input
+                type="email"
+                className="form-input"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                autoComplete="email"
+                required
+              />
+            </div>
 
-          <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
-            {loading ? <Spinner size={18} /> : 'Создать аккаунт'}
-          </button>
-        </form>
+            <div className="form-group">
+              <label className="form-label">Пароль</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  className="form-input"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Минимум 6 символов"
+                  autoComplete="new-password"
+                  required
+                  minLength={6}
+                  style={{ paddingRight: 44 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(s => !s)}
+                  style={{
+                    position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'var(--clr-muted)', padding: 4, display: 'flex',
+                  }}
+                  tabIndex={-1}
+                  aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
 
-        <p className="auth-footer">
-          Уже есть аккаунт? <Link to="/login">Войти</Link>
-        </p>
+            {error && <div className="form-error">{error}</div>}
+
+            <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
+              {loading ? <Spinner size={18} /> : 'Создать аккаунт'}
+            </button>
+          </form>
+
+          <p className="auth-footer">
+            Уже есть аккаунт? <Link to="/login">Войти</Link>
+          </p>
+        </div>
       </div>
     </div>
   );

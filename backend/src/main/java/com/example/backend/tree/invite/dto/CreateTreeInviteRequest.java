@@ -9,7 +9,7 @@ public class CreateTreeInviteRequest {
   private String email;
 
   @NotNull
-  private String role; // EDITOR / VIEWER
+  private String role; // EDITOR / COMMENTATOR / VIEWER
 
   public String getEmail() {
     return email;

@@ -1,0 +1,79 @@
+- generic [ref=e3]:
+  - link "Перейти к содержимому" [ref=e4] [cursor=pointer]:
+    - /url: "#main-content"
+  - complementary [ref=e5]:
+    - generic [ref=e6]:
+      - img [ref=e7]
+      - generic [ref=e10]: Семейное Древо
+    - navigation [ref=e11]:
+      - link "Мои деревья" [ref=e12] [cursor=pointer]:
+        - /url: /trees
+        - img [ref=e13]
+        - text: Мои деревья
+      - link "Приглашения" [ref=e16] [cursor=pointer]:
+        - /url: /invites
+        - img [ref=e17]
+        - text: Приглашения
+      - link "Профиль" [ref=e20] [cursor=pointer]:
+        - /url: /profile
+        - img [ref=e21]
+        - text: Профиль
+    - generic [ref=e25]:
+      - link "D Пользователь denis.bazhenov2005@yandex.ru" [ref=e26] [cursor=pointer]:
+        - /url: /profile
+        - generic [ref=e27]: D
+        - generic [ref=e28]:
+          - generic [ref=e29]: Пользователь
+          - generic [ref=e30]: denis.bazhenov2005@yandex.ru
+      - button "Тёмная тема" [ref=e31] [cursor=pointer]:
+        - img [ref=e32]
+      - button "Выйти" [ref=e34] [cursor=pointer]:
+        - img [ref=e35]
+  - main [ref=e38]:
+    - generic [ref=e40]:
+      - heading "Профиль" [level=1] [ref=e41]
+      - paragraph [ref=e42]: Управление учётной записью
+    - generic [ref=e43]:
+      - generic [ref=e44]:
+        - generic [ref=e45]:
+          - img [ref=e46]
+          - text: Основные данные
+        - generic [ref=e49]:
+          - generic [ref=e50]: D
+          - generic [ref=e51]:
+            - generic [ref=e52]: Пользователь
+            - generic [ref=e53]:
+              - img [ref=e54]
+              - text: denis.bazhenov2005@yandex.ru
+        - generic [ref=e57]:
+          - generic [ref=e58]:
+            - img [ref=e59]
+            - generic [ref=e62]: "11"
+            - generic [ref=e63]: деревьев
+          - generic [ref=e65]:
+            - img [ref=e66]
+            - generic [ref=e71]: "420"
+            - generic [ref=e72]: человек
+        - generic [ref=e73]:
+          - generic [ref=e74]:
+            - generic [ref=e75]: Email
+            - textbox [disabled] [ref=e76]: denis.bazhenov2005@yandex.ru
+          - generic [ref=e77]:
+            - generic [ref=e78]: Отображаемое имя
+            - textbox "Иван Иванов" [ref=e79]
+          - button "Сохранить" [ref=e81] [cursor=pointer]
+      - generic [ref=e82]:
+        - generic [ref=e83]:
+          - img [ref=e84]
+          - text: Смена пароля
+        - generic [ref=e87]:
+          - generic [ref=e88]:
+            - generic [ref=e89]: Текущий пароль
+            - textbox [ref=e90]
+          - generic [ref=e91]:
+            - generic [ref=e92]: Новый пароль
+            - textbox "Минимум 6 символов" [ref=e93]
+          - generic [ref=e94]:
+            - generic [ref=e95]: Подтвердите новый пароль
+            - textbox [ref=e96]
+          - button "Изменить пароль" [disabled] [ref=e98]

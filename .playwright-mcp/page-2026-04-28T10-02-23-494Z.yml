@@ -1,0 +1,67 @@
+- generic [ref=e3]:
+  - link "Перейти к содержимому" [ref=e4] [cursor=pointer]:
+    - /url: "#main-content"
+  - complementary [ref=e5]:
+    - generic [ref=e6]:
+      - img [ref=e7]
+      - generic [ref=e10]: Семейное Древо
+    - navigation [ref=e11]:
+      - link "Мои деревья" [ref=e12] [cursor=pointer]:
+        - /url: /trees
+        - img [ref=e13]
+        - text: Мои деревья
+      - link "Приглашения" [ref=e16] [cursor=pointer]:
+        - /url: /invites
+        - img [ref=e17]
+        - text: Приглашения
+      - link "Профиль" [ref=e20] [cursor=pointer]:
+        - /url: /profile
+        - img [ref=e21]
+        - text: Профиль
+    - generic [ref=e25]:
+      - link "D Пользователь denis.bazhenov2005@yandex.ru" [ref=e26] [cursor=pointer]:
+        - /url: /profile
+        - generic [ref=e27]: D
+        - generic [ref=e28]:
+          - generic [ref=e29]: Пользователь
+          - generic [ref=e30]: denis.bazhenov2005@yandex.ru
+      - button "Тёмная тема" [ref=e31] [cursor=pointer]:
+        - img [ref=e32]
+      - button "Выйти" [ref=e34] [cursor=pointer]:
+        - img [ref=e35]
+  - main [ref=e38]:
+    - generic [ref=e39]:
+      - generic [ref=e40]:
+        - generic [ref=e41]:
+          - link "Назад к списку деревьев" [ref=e42] [cursor=pointer]:
+            - /url: /trees
+            - img [ref=e43]
+          - generic [ref=e68]:
+            - heading "Баженовы" [level=1] [ref=e69]
+            - generic [ref=e70]: Владелец
+        - generic [ref=e48]:
+          - generic [ref=e72]:
+            - img [ref=e73]
+            - textbox "Найти человека… ⌘K" [ref=e76]: Баженов
+            - button [ref=e615] [cursor=pointer]:
+              - img [ref=e616]
+          - generic [ref=e77]:
+            - button "Вид дерева" [ref=e78] [cursor=pointer]:
+              - img [ref=e79]
+              - generic [ref=e84]: Древо
+            - button "Радиальный вид" [ref=e85] [cursor=pointer]:
+              - img [ref=e86]
+              - generic [ref=e89]: Веер
+            - button "Хронология" [active] [ref=e90] [cursor=pointer]:
+              - img [ref=e91]
+              - generic [ref=e93]: Хронология
+          - button "Обновить граф" [ref=e49] [cursor=pointer]:
+            - img [ref=e50]
+          - button "Добавить человека" [ref=e94] [cursor=pointer]:
+            - img [ref=e95]
+            - text: Добавить
+          - button "Ещё" [ref=e56] [cursor=pointer]:
+            - img [ref=e57]
+      - generic [ref=e746]:
+        - img [ref=e747]
+        - paragraph [ref=e749]: Нет событий. Добавьте события к людям в дереве.

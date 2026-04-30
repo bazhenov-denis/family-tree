@@ -1,0 +1,144 @@
+- generic [ref=e255]:
+  - complementary [ref=e256]:
+    - generic [ref=e257]:
+      - img [ref=e258]
+      - generic [ref=e261]: Семейное Древо
+    - navigation [ref=e262]:
+      - link "Мои деревья" [ref=e263] [cursor=pointer]:
+        - /url: /trees
+        - img [ref=e264]
+        - text: Мои деревья
+      - link "Приглашения" [ref=e267] [cursor=pointer]:
+        - /url: /invites
+        - img [ref=e268]
+        - text: Приглашения
+      - link "Профиль" [ref=e271] [cursor=pointer]:
+        - /url: /profile
+        - img [ref=e272]
+        - text: Профиль
+    - generic [ref=e276]:
+      - link "D Пользователь denis.bazhenov2005@yandex.ru" [ref=e277] [cursor=pointer]:
+        - /url: /profile
+        - generic [ref=e278]: D
+        - generic [ref=e279]:
+          - generic [ref=e280]: Пользователь
+          - generic [ref=e281]: denis.bazhenov2005@yandex.ru
+      - button "Тёмная тема" [ref=e282] [cursor=pointer]:
+        - img [ref=e283]
+      - button "Выйти" [ref=e285] [cursor=pointer]:
+        - img [ref=e286]
+  - main [ref=e289]:
+    - generic [ref=e290]:
+      - generic [ref=e291]:
+        - generic [ref=e292]:
+          - link "Деревья" [ref=e293] [cursor=pointer]:
+            - /url: /trees
+            - img [ref=e294]
+            - text: Деревья
+          - heading "Баженовы" [level=1] [ref=e297]
+        - generic [ref=e298]:
+          - generic [ref=e300]:
+            - img [ref=e301]
+            - textbox "Найти человека…" [ref=e304]
+          - generic [ref=e305]:
+            - button "Дерево" [active] [ref=e306] [cursor=pointer]:
+              - img [ref=e307]
+            - button "Радиальный вид" [ref=e312] [cursor=pointer]:
+              - img [ref=e313]
+            - button "Хронология" [ref=e316] [cursor=pointer]:
+              - img [ref=e317]
+          - button "Обновить граф" [ref=e319] [cursor=pointer]:
+            - img [ref=e320]
+          - button "Добавить" [ref=e325] [cursor=pointer]:
+            - img [ref=e326]
+            - text: Добавить
+          - button "Ещё" [ref=e330] [cursor=pointer]:
+            - img [ref=e331]
+      - generic [ref=e335]:
+        - generic [ref=e476]:
+          - img [ref=e477]:
+            - generic [ref=e479]:
+              - generic [ref=e481] [cursor=pointer]:
+                - generic: Денис
+                - generic: Баженов
+              - generic [ref=e485] [cursor=pointer]:
+                - generic: ВБ
+                - generic: Вилена
+                - generic: Баженова
+                - generic: "2005"
+              - generic [ref=e488] [cursor=pointer]:
+                - generic: Е
+                - generic: Евгений
+                - generic "Свернуть ветвь" [ref=e491]:
+                  - generic: ▾
+              - generic [ref=e493] [cursor=pointer]:
+                - generic: Михаил
+                - generic: Баженов
+                - generic: "2018"
+              - generic [ref=e497] [cursor=pointer]:
+                - generic: Анастасия
+                - generic: Баженова
+                - generic: "2010"
+              - generic [ref=e501] [cursor=pointer]:
+                - generic: Оксана
+                - generic: Баженова
+                - generic: "1982"
+                - generic "Свернуть ветвь" [ref=e505]:
+                  - generic: ▾
+              - generic [ref=e507] [cursor=pointer]:
+                - generic: СБ
+                - generic: Сергей
+                - generic: Баженов
+                - generic: "1952"
+                - generic "Свернуть ветвь" [ref=e510]:
+                  - generic: ▾
+              - generic [ref=e512] [cursor=pointer]:
+                - generic: ЛБ
+                - generic: Лариса
+                - generic: Баженова
+                - generic: "1955"
+                - generic "Свернуть ветвь" [ref=e515]:
+                  - generic: ▾
+              - generic [ref=e517] [cursor=pointer]:
+                - generic: ПБ
+                - generic: Павел
+                - generic: Баженов
+                - generic: "1976"
+                - generic "Свернуть ветвь" [ref=e520]:
+                  - generic: ▾
+              - generic [ref=e522] [cursor=pointer]:
+                - generic: ГБ
+                - generic: Галина
+                - generic: Баженова
+                - generic: "1980"
+                - generic "Свернуть ветвь" [ref=e525]:
+                  - generic: ▾
+              - generic [ref=e527] [cursor=pointer]:
+                - generic: ДБ
+                - generic: Дмитрий
+                - generic: Баженов
+                - generic: "1998"
+              - generic [ref=e530] [cursor=pointer]:
+                - generic: Л
+                - generic: Леонид
+                - generic "Свернуть ветвь" [ref=e533]:
+                  - generic: ▾
+          - generic [ref=e535]:
+            - button "+" [ref=e536] [cursor=pointer]
+            - button "71%" [ref=e538] [cursor=pointer]
+            - button "−" [ref=e540] [cursor=pointer]
+            - button "⊡" [ref=e542] [cursor=pointer]
+          - generic:
+            - img
+        - generic [ref=e403]:
+          - generic [ref=e404] [cursor=pointer]:
+            - img [ref=e405]
+            - generic [ref=e408]: Дни рождения
+            - generic [ref=e409]: "1"
+            - img [ref=e411]
+          - generic [ref=e414]:
+            - generic [ref=e416]: ВБ
+            - generic [ref=e417]:
+              - generic [ref=e418]: Вилена Баженова
+              - generic [ref=e419]: 14 апреля · 21 лет
+            - generic [ref=e420]: через 3 дня

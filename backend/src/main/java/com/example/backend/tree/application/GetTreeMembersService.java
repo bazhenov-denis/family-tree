@@ -58,6 +58,7 @@ public class GetTreeMembersService {
 
   private TreeMemberResponse toResponse(TreeMember member) {
     return new TreeMemberResponse(
+        member.getId(),
         member.getUser().getId(),
         member.getUser().getEmail(),
         member.getRole().name()

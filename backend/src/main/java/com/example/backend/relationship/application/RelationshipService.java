@@ -10,6 +10,7 @@ import com.example.backend.relationship.entity.Relationship;
 import com.example.backend.relationship.entity.RelationshipType;
 import com.example.backend.relationship.repository.RelationshipRepository;
 import com.example.backend.security.CurrentUserProvider;
+import com.example.backend.tree.domain.BranchPermissionService;
 import com.example.backend.tree.domain.TreePermissionService;
 import com.example.backend.tree.entity.FamilyTree;
 import com.example.backend.tree.entity.TreeMember;
@@ -35,6 +36,7 @@ public class RelationshipService {
   private final TreeMemberRepository memberRepository;
   private final CurrentUserProvider currentUserProvider;
   private final TreePermissionService permissionService;
+  private final BranchPermissionService branchPermissionService;
   private final AuditService auditService;
 
   public RelationshipService(
@@ -44,6 +46,7 @@ public class RelationshipService {
       TreeMemberRepository memberRepository,
       CurrentUserProvider currentUserProvider,
       TreePermissionService permissionService,
+      BranchPermissionService branchPermissionService,
       AuditService auditService
   ) {
     this.relationshipRepository = relationshipRepository;
@@ -52,6 +55,7 @@ public class RelationshipService {
     this.memberRepository = memberRepository;
     this.currentUserProvider = currentUserProvider;
     this.permissionService = permissionService;
+    this.branchPermissionService = branchPermissionService;
     this.auditService = auditService;
   }
 
@@ -71,6 +75,10 @@ public class RelationshipService {
 
     Person fromPerson = resolvePersonInTree(req.getFromPersonId(), treeId);
     Person toPerson = resolvePersonInTree(req.getToPersonId(), treeId);
+
+    // Check branch permissions for both persons
+    permissionService.checkCanEditPerson(member, fromPerson.getId(), branchPermissionService);
+    permissionService.checkCanEditPerson(member, toPerson.getId(), branchPermissionService);
 
     checkNoDuplicate(treeId, req.getFromPersonId(), req.getToPersonId(), req.getType());
 
@@ -152,6 +160,10 @@ public class RelationshipService {
     if (!relationship.getTree().getId().equals(treeId)) {
       throw new SecurityException("Access denied");
     }
+
+    // Check branch permissions for both persons in the relationship
+    permissionService.checkCanEditPerson(member, relationship.getFromPerson().getId(), branchPermissionService);
+    permissionService.checkCanEditPerson(member, relationship.getToPerson().getId(), branchPermissionService);
 
     String before = AuditService.descJson(relDesc(
         relationship.getFromPerson(), relationship.getToPerson(), relationship.getType().name()));

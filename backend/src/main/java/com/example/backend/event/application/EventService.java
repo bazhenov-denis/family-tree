@@ -11,6 +11,7 @@ import com.example.backend.event.repository.EventRepository;
 import com.example.backend.person.entity.Person;
 import com.example.backend.person.repository.PersonRepository;
 import com.example.backend.security.CurrentUserProvider;
+import com.example.backend.tree.domain.BranchPermissionService;
 import com.example.backend.tree.domain.TreePermissionService;
 import com.example.backend.tree.entity.FamilyTree;
 import com.example.backend.tree.entity.TreeMember;
@@ -31,6 +32,7 @@ public class EventService {
   private final TreeMemberRepository memberRepository;
   private final CurrentUserProvider currentUserProvider;
   private final TreePermissionService permissionService;
+  private final BranchPermissionService branchPermissionService;
 
   public EventService(
       EventRepository eventRepository,
@@ -39,7 +41,8 @@ public class EventService {
       FamilyTreeRepository treeRepository,
       TreeMemberRepository memberRepository,
       CurrentUserProvider currentUserProvider,
-      TreePermissionService permissionService
+      TreePermissionService permissionService,
+      BranchPermissionService branchPermissionService
   ) {
     this.eventRepository = eventRepository;
     this.eventPersonRepository = eventPersonRepository;
@@ -48,6 +51,7 @@ public class EventService {
     this.memberRepository = memberRepository;
     this.currentUserProvider = currentUserProvider;
     this.permissionService = permissionService;
+    this.branchPermissionService = branchPermissionService;
   }
 
   public List<TreeEventResponse> listForTree(UUID treeId) {
@@ -72,6 +76,7 @@ public class EventService {
     TreeMember member = resolveMember(treeId);
     permissionService.checkCanEdit(member);
     Person person = resolvePerson(treeId, personId);
+    permissionService.checkCanEditPerson(member, personId, branchPermissionService);
 
     Event event = new Event(member.getTree(), req.getType(), req.getTitle(), req.getDateFrom(), req.getDateTo());
     eventRepository.save(event);
@@ -84,6 +89,11 @@ public class EventService {
     TreeMember member = resolveMember(treeId);
     permissionService.checkCanEdit(member);
     Event event = resolveEvent(treeId, eventId);
+
+    // Check branch permissions for all persons linked to this event
+    eventPersonRepository.findAllByEvent(event).stream()
+        .map(EventPerson::getPerson)
+        .forEach(p -> permissionService.checkCanEditPerson(member, p.getId(), branchPermissionService));
 
     event.setType(req.getType());
     event.setTitle(req.getTitle());
@@ -98,6 +108,12 @@ public class EventService {
     TreeMember member = resolveMember(treeId);
     permissionService.checkCanEdit(member);
     Event event = resolveEvent(treeId, eventId);
+
+    // Check branch permissions for all persons linked to this event
+    eventPersonRepository.findAllByEvent(event).stream()
+        .map(EventPerson::getPerson)
+        .forEach(p -> permissionService.checkCanEditPerson(member, p.getId(), branchPermissionService));
+
     eventPersonRepository.deleteAllByEvent(event);
     eventRepository.delete(event);
   }

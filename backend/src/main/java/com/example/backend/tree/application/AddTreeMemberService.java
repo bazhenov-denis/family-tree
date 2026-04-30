@@ -63,6 +63,7 @@ public class AddTreeMemberService {
 
     TreeMember member = switch (role) {
       case EDITOR -> TreeMember.editor(tree, userToAdd);
+      case COMMENTATOR -> TreeMember.commentator(tree, userToAdd);
       case VIEWER -> TreeMember.viewer(tree, userToAdd);
       default -> throw new IllegalArgumentException("Invalid role");
     };
@@ -70,6 +71,7 @@ public class AddTreeMemberService {
     memberRepository.save(member);
 
     return new TreeMemberResponse(
+        member.getId(),
         userToAdd.getId(),
         userToAdd.getEmail(),
         member.getRole().name()

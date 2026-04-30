@@ -15,6 +15,7 @@ import java.util.List;
 import com.example.backend.person.repository.PersonRepository;
 import com.example.backend.relationship.repository.RelationshipRepository;
 import com.example.backend.security.CurrentUserProvider;
+import com.example.backend.tree.domain.BranchPermissionService;
 import com.example.backend.tree.domain.TreePermissionService;
 import com.example.backend.tree.entity.FamilyTree;
 import com.example.backend.tree.entity.TreeMember;
@@ -33,6 +34,7 @@ public class PersonService {
   private final TreeMemberRepository memberRepository;
   private final CurrentUserProvider currentUserProvider;
   private final TreePermissionService permissionService;
+  private final BranchPermissionService branchPermissionService;
   private final AuditService auditService;
 
   public PersonService(
@@ -42,6 +44,7 @@ public class PersonService {
       TreeMemberRepository memberRepository,
       CurrentUserProvider currentUserProvider,
       TreePermissionService permissionService,
+      BranchPermissionService branchPermissionService,
       AuditService auditService
   ) {
     this.personRepository = personRepository;
@@ -50,6 +53,7 @@ public class PersonService {
     this.memberRepository = memberRepository;
     this.currentUserProvider = currentUserProvider;
     this.permissionService = permissionService;
+    this.branchPermissionService = branchPermissionService;
     this.auditService = auditService;
   }
 
@@ -92,7 +96,7 @@ public class PersonService {
 
   public PersonResponse update(UUID treeId, UUID personId, PersonRequest req) {
     TreeMember member = resolveMember(treeId);
-    permissionService.checkCanEdit(member);
+    permissionService.checkCanEditPerson(member, personId, branchPermissionService);
 
     Person person = resolvePerson(treeId, personId);
     String before = AuditService.descJson(fullName(person));
@@ -155,7 +159,7 @@ public class PersonService {
   @Transactional
   public void delete(UUID treeId, UUID personId) {
     TreeMember member = resolveMember(treeId);
-    permissionService.checkCanEdit(member);
+    permissionService.checkCanEditPerson(member, personId, branchPermissionService);
 
     Person person = resolvePerson(treeId, personId);
     String before = AuditService.descJson(fullName(person));

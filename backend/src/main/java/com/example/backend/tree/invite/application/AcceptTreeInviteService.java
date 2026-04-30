@@ -50,6 +50,7 @@ public class AcceptTreeInviteService {
     if (!alreadyMember) {
       TreeMember member = switch (invite.getRole()) {
         case EDITOR -> TreeMember.editor(invite.getTree(), currentUser);
+        case COMMENTATOR -> TreeMember.commentator(invite.getTree(), currentUser);
         case VIEWER -> TreeMember.viewer(invite.getTree(), currentUser);
         default -> throw new IllegalStateException("Invalid invite role");
       };

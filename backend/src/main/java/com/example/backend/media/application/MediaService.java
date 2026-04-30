@@ -2,6 +2,8 @@ package com.example.backend.media.application;
 
 import com.example.backend.auth.entity.User;
 import com.example.backend.event.entity.Event;
+import com.example.backend.event.entity.EventPerson;
+import com.example.backend.event.repository.EventPersonRepository;
 import com.example.backend.event.repository.EventRepository;
 import com.example.backend.media.dto.MediaRequest;
 import com.example.backend.media.dto.MediaResponse;
@@ -11,6 +13,7 @@ import com.example.backend.person.entity.Person;
 import com.example.backend.person.repository.PersonRepository;
 import com.example.backend.security.CurrentUserProvider;
 import com.example.backend.shared.exception.NotFoundException;
+import com.example.backend.tree.domain.BranchPermissionService;
 import com.example.backend.tree.domain.TreePermissionService;
 import com.example.backend.tree.entity.FamilyTree;
 import com.example.backend.tree.entity.TreeMember;
@@ -26,27 +29,33 @@ public class MediaService {
   private final MediaRepository mediaRepository;
   private final PersonRepository personRepository;
   private final EventRepository eventRepository;
+  private final EventPersonRepository eventPersonRepository;
   private final FamilyTreeRepository treeRepository;
   private final TreeMemberRepository memberRepository;
   private final CurrentUserProvider currentUserProvider;
   private final TreePermissionService permissionService;
+  private final BranchPermissionService branchPermissionService;
 
   public MediaService(
       MediaRepository mediaRepository,
       PersonRepository personRepository,
       EventRepository eventRepository,
+      EventPersonRepository eventPersonRepository,
       FamilyTreeRepository treeRepository,
       TreeMemberRepository memberRepository,
       CurrentUserProvider currentUserProvider,
-      TreePermissionService permissionService
+      TreePermissionService permissionService,
+      BranchPermissionService branchPermissionService
   ) {
     this.mediaRepository     = mediaRepository;
     this.personRepository    = personRepository;
     this.eventRepository     = eventRepository;
+    this.eventPersonRepository = eventPersonRepository;
     this.treeRepository      = treeRepository;
     this.memberRepository    = memberRepository;
     this.currentUserProvider = currentUserProvider;
     this.permissionService   = permissionService;
+    this.branchPermissionService = branchPermissionService;
   }
 
   public List<MediaResponse> list(UUID treeId, UUID personId) {
@@ -62,6 +71,7 @@ public class MediaService {
     TreeMember member = resolveMember(treeId);
     permissionService.checkCanEdit(member);
     Person person = resolvePerson(treeId, personId);
+    permissionService.checkCanEditPerson(member, personId, branchPermissionService);
 
     Media media = new Media(member.getTree(), person, req.getUrl(), req.getDescription(),
         req.getMimeType(), req.getFileName());
@@ -97,6 +107,17 @@ public class MediaService {
     if (!media.getTree().getId().equals(treeId)) {
       throw new SecurityException("Access denied");
     }
+
+    // Check branch permissions if media is attached to a person
+    if (media.getPerson() != null) {
+      permissionService.checkCanEditPerson(member, media.getPerson().getId(), branchPermissionService);
+    }
+    if (media.getEvent() != null) {
+      eventPersonRepository.findAllByEvent(media.getEvent()).stream()
+          .map(EventPerson::getPerson)
+          .forEach(p -> permissionService.checkCanEditPerson(member, p.getId(), branchPermissionService));
+    }
+
     mediaRepository.delete(media);
   }
 

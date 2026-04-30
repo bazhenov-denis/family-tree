@@ -1,5 +1,6 @@
 package com.example.backend.tree.application;
 
+import com.example.backend.tree.domain.BranchPermissionService;
 import com.example.backend.tree.domain.TreePermissionService;
 import com.example.backend.tree.dto.ChangeTreeMemberRoleRequest;
 import com.example.backend.tree.entity.FamilyTree;
@@ -21,17 +22,20 @@ public class ChangeTreeMemberRoleService {
   private final TreeMemberRepository memberRepository;
   private final CurrentUserProvider currentUserProvider;
   private final TreePermissionService permissionService;
+  private final BranchPermissionService branchPermissionService;
 
   public ChangeTreeMemberRoleService(
       FamilyTreeRepository treeRepository,
       TreeMemberRepository memberRepository,
       CurrentUserProvider currentUserProvider,
-      TreePermissionService permissionService
+      TreePermissionService permissionService,
+      BranchPermissionService branchPermissionService
   ) {
     this.treeRepository = treeRepository;
     this.memberRepository = memberRepository;
     this.currentUserProvider = currentUserProvider;
     this.permissionService = permissionService;
+    this.branchPermissionService = branchPermissionService;
   }
 
   @Transactional
@@ -67,5 +71,10 @@ public class ChangeTreeMemberRoleService {
 
     // 🔥 ВСЯ БИЗНЕС-ЛОГИКА ЗДЕСЬ
     targetMember.changeRole(newRole);
+
+    // Clear branch permissions if changing away from EDITOR
+    if (newRole != TreeRole.EDITOR) {
+      branchPermissionService.setBranchRoots(targetMember.getId(), java.util.List.of());
+    }
   }
 }

@@ -1,5 +1,8 @@
 package com.example.backend.tree.application;
 
+import com.example.backend.event.repository.EventRepository;
+import com.example.backend.media.repository.MediaRepository;
+import com.example.backend.person.repository.PersonRepository;
 import com.example.backend.tree.domain.TreePermissionService;
 import com.example.backend.tree.dto.TreeResponse;
 import com.example.backend.tree.dto.UpdateTreeRequest;
@@ -21,17 +24,26 @@ public class UpdateTreeService {
   private final TreeMemberRepository memberRepository;
   private final CurrentUserProvider currentUserProvider;
   private final TreePermissionService permissionService;
+  private final PersonRepository personRepository;
+  private final EventRepository eventRepository;
+  private final MediaRepository mediaRepository;
 
   public UpdateTreeService(
       FamilyTreeRepository treeRepository,
       TreeMemberRepository memberRepository,
       CurrentUserProvider currentUserProvider,
-      TreePermissionService permissionService
+      TreePermissionService permissionService,
+      PersonRepository personRepository,
+      EventRepository eventRepository,
+      MediaRepository mediaRepository
   ) {
     this.treeRepository = treeRepository;
     this.memberRepository = memberRepository;
     this.currentUserProvider = currentUserProvider;
     this.permissionService = permissionService;
+    this.personRepository = personRepository;
+    this.eventRepository = eventRepository;
+    this.mediaRepository = mediaRepository;
   }
 
   @Transactional
@@ -54,12 +66,20 @@ public class UpdateTreeService {
         request.getDescription()
     );
 
+    int personCount = personRepository.findAllByTreeId(treeId).size();
+    int eventCount = eventRepository.findAllByTreeId(treeId).size();
+    int mediaCount = mediaRepository.findAllByTreeIdOrderByCreatedAtAsc(treeId).size();
+
     return new TreeResponse(
         tree.getId(),
         tree.getTitle(),
         tree.getDescription(),
         tree.getCreatedAt(),
-        member.getRole().name()
+        tree.getUpdatedAt(),
+        member.getRole().name(),
+        personCount,
+        eventCount,
+        mediaCount
     );
   }
 }

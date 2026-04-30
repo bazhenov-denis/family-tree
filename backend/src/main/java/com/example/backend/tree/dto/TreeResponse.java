@@ -9,20 +9,32 @@ public class TreeResponse {
   private String title;
   private String description;
   private Instant createdAt;
+  private Instant updatedAt;
   private String role;
+  private int personCount;
+  private int eventCount;
+  private int mediaCount;
 
   public TreeResponse(
       UUID id,
       String title,
       String description,
       Instant createdAt,
-      String role
+      Instant updatedAt,
+      String role,
+      int personCount,
+      int eventCount,
+      int mediaCount
   ) {
     this.id = id;
     this.title = title;
     this.description = description;
     this.createdAt = createdAt;
+    this.updatedAt = updatedAt;
     this.role = role;
+    this.personCount = personCount;
+    this.eventCount = eventCount;
+    this.mediaCount = mediaCount;
   }
 
   public UUID getId() {
@@ -41,7 +53,23 @@ public class TreeResponse {
     return createdAt;
   }
 
+  public Instant getUpdatedAt() {
+    return updatedAt;
+  }
+
   public String getRole() {
     return role;
+  }
+
+  public int getPersonCount() {
+    return personCount;
+  }
+
+  public int getEventCount() {
+    return eventCount;
+  }
+
+  public int getMediaCount() {
+    return mediaCount;
   }
 }

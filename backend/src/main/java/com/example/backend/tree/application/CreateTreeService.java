@@ -49,7 +49,9 @@ public class CreateTreeService {
         tree.getTitle(),
         tree.getDescription(),
         tree.getCreatedAt(),
-        owner.getRole().name()
+        tree.getUpdatedAt(),
+        owner.getRole().name(),
+        0, 0, 0
     );
   }
 }

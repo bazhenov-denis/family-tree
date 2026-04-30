@@ -48,6 +48,10 @@ public class TreeMember extends BaseEntity {
     return new TreeMember(tree, user, TreeRole.VIEWER);
   }
 
+  public static TreeMember commentator(FamilyTree tree, User user) {
+    return new TreeMember(tree, user, TreeRole.COMMENTATOR);
+  }
+
   public boolean isOwner() {
     return role == TreeRole.OWNER;
   }

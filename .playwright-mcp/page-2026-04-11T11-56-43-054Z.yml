@@ -1,0 +1,174 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - img [ref=e6]
+      - generic [ref=e9]: Семейное Древо
+    - navigation [ref=e10]:
+      - link "Мои деревья" [ref=e11] [cursor=pointer]:
+        - /url: /trees
+        - img [ref=e12]
+        - text: Мои деревья
+      - link "Приглашения" [ref=e15] [cursor=pointer]:
+        - /url: /invites
+        - img [ref=e16]
+        - text: Приглашения
+      - link "Профиль" [ref=e19] [cursor=pointer]:
+        - /url: /profile
+        - img [ref=e20]
+        - text: Профиль
+    - generic [ref=e24]:
+      - link "D Пользователь denis.bazhenov2005@yandex.ru" [ref=e25] [cursor=pointer]:
+        - /url: /profile
+        - generic [ref=e26]: D
+        - generic [ref=e27]:
+          - generic [ref=e28]: Пользователь
+          - generic [ref=e29]: denis.bazhenov2005@yandex.ru
+      - button "Тёмная тема" [ref=e30] [cursor=pointer]:
+        - img [ref=e31]
+      - button "Выйти" [ref=e33] [cursor=pointer]:
+        - img [ref=e34]
+  - main [ref=e37]:
+    - generic [ref=e38]:
+      - generic [ref=e39]:
+        - heading "Мои деревья" [level=1] [ref=e40]
+        - paragraph [ref=e41]: 7 деревьев
+      - button "Новое дерево" [ref=e42] [cursor=pointer]:
+        - img [ref=e43]
+        - text: Новое дерево
+    - generic [ref=e44]:
+      - generic [ref=e45]:
+        - img [ref=e47]
+        - generic [ref=e50]:
+          - generic [ref=e51]:
+            - heading "к" [level=3] [ref=e52]
+            - generic [ref=e53]: Владелец
+          - generic [ref=e54]: Создано 26.02.2026
+        - generic [ref=e55]:
+          - button "Редактировать" [ref=e56] [cursor=pointer]:
+            - img [ref=e57]
+          - link "Участники" [ref=e59] [cursor=pointer]:
+            - /url: /trees/0b50569a-cb7e-449c-a5aa-528ccee575e0/members
+            - img [ref=e60]
+          - button "Удалить" [ref=e65] [cursor=pointer]:
+            - img [ref=e66]
+          - link "Открыть" [ref=e69] [cursor=pointer]:
+            - /url: /trees/0b50569a-cb7e-449c-a5aa-528ccee575e0
+            - text: Открыть
+            - img [ref=e70]
+      - generic [ref=e72]:
+        - img [ref=e74]
+        - generic [ref=e77]:
+          - generic [ref=e78]:
+            - heading "3к3" [level=3] [ref=e79]
+            - generic [ref=e80]: Владелец
+          - paragraph [ref=e81]: 3к3
+          - generic [ref=e82]: Создано 26.02.2026
+        - generic [ref=e83]:
+          - button "Редактировать" [ref=e84] [cursor=pointer]:
+            - img [ref=e85]
+          - link "Участники" [ref=e87] [cursor=pointer]:
+            - /url: /trees/d56ea0da-4469-4a92-8075-aa18e2e54648/members
+            - img [ref=e88]
+          - button "Удалить" [ref=e93] [cursor=pointer]:
+            - img [ref=e94]
+          - link "Открыть" [ref=e97] [cursor=pointer]:
+            - /url: /trees/d56ea0da-4469-4a92-8075-aa18e2e54648
+            - text: Открыть
+            - img [ref=e98]
+      - generic [ref=e100]:
+        - img [ref=e102]
+        - generic [ref=e105]:
+          - generic [ref=e106]:
+            - heading "п" [level=3] [ref=e107]
+            - generic [ref=e108]: Владелец
+          - paragraph [ref=e109]: п
+          - generic [ref=e110]: Создано 26.02.2026
+        - generic [ref=e111]:
+          - button "Редактировать" [ref=e112] [cursor=pointer]:
+            - img [ref=e113]
+          - link "Участники" [ref=e115] [cursor=pointer]:
+            - /url: /trees/3aeeccd2-797f-4d61-af4f-8002ea75bc35/members
+            - img [ref=e116]
+          - button "Удалить" [ref=e121] [cursor=pointer]:
+            - img [ref=e122]
+          - link "Открыть" [ref=e125] [cursor=pointer]:
+            - /url: /trees/3aeeccd2-797f-4d61-af4f-8002ea75bc35
+            - text: Открыть
+            - img [ref=e126]
+      - generic [ref=e128]:
+        - img [ref=e130]
+        - generic [ref=e133]:
+          - generic [ref=e134]:
+            - heading "44" [level=3] [ref=e135]
+            - generic [ref=e136]: Владелец
+          - paragraph [ref=e137]: ага
+          - generic [ref=e138]: Создано 26.02.2026
+        - generic [ref=e139]:
+          - button "Редактировать" [ref=e140] [cursor=pointer]:
+            - img [ref=e141]
+          - link "Участники" [ref=e143] [cursor=pointer]:
+            - /url: /trees/1ba72c7e-93b1-4434-ba58-8a01c46e020f/members
+            - img [ref=e144]
+          - button "Удалить" [ref=e149] [cursor=pointer]:
+            - img [ref=e150]
+          - link "Открыть" [ref=e153] [cursor=pointer]:
+            - /url: /trees/1ba72c7e-93b1-4434-ba58-8a01c46e020f
+            - text: Открыть
+            - img [ref=e154]
+      - generic [ref=e156]:
+        - img [ref=e158]
+        - generic [ref=e161]:
+          - generic [ref=e162]:
+            - heading "новое дерево" [level=3] [ref=e163]
+            - generic [ref=e164]: Владелец
+          - generic [ref=e165]: Создано 26.02.2026
+        - generic [ref=e166]:
+          - button "Редактировать" [ref=e167] [cursor=pointer]:
+            - img [ref=e168]
+          - link "Участники" [ref=e170] [cursor=pointer]:
+            - /url: /trees/91a85c07-1515-42fc-8986-e70115cbfc7c/members
+            - img [ref=e171]
+          - button "Удалить" [ref=e176] [cursor=pointer]:
+            - img [ref=e177]
+          - link "Открыть" [ref=e180] [cursor=pointer]:
+            - /url: /trees/91a85c07-1515-42fc-8986-e70115cbfc7c
+            - text: Открыть
+            - img [ref=e181]
+      - generic [ref=e183]:
+        - img [ref=e185]
+        - generic [ref=e188]:
+          - generic [ref=e189]:
+            - heading "зоро" [level=3] [ref=e190]
+            - generic [ref=e191]: Владелец
+          - generic [ref=e192]: Создано 26.02.2026
+        - generic [ref=e193]:
+          - button "Редактировать" [ref=e194] [cursor=pointer]:
+            - img [ref=e195]
+          - link "Участники" [ref=e197] [cursor=pointer]:
+            - /url: /trees/0c5cb41c-292c-4405-ae2b-fc3d7ebe454d/members
+            - img [ref=e198]
+          - button "Удалить" [ref=e203] [cursor=pointer]:
+            - img [ref=e204]
+          - link "Открыть" [ref=e207] [cursor=pointer]:
+            - /url: /trees/0c5cb41c-292c-4405-ae2b-fc3d7ebe454d
+            - text: Открыть
+            - img [ref=e208]
+      - generic [ref=e210]:
+        - img [ref=e212]
+        - generic [ref=e215]:
+          - generic [ref=e216]:
+            - heading "Баженовы" [level=3] [ref=e217]
+            - generic [ref=e218]: Владелец
+          - generic [ref=e219]: Создано 26.02.2026
+        - generic [ref=e220]:
+          - button "Редактировать" [ref=e221] [cursor=pointer]:
+            - img [ref=e222]
+          - link "Участники" [ref=e224] [cursor=pointer]:
+            - /url: /trees/b4c50cf4-c7b1-4e77-8ea8-979797fdc5cf/members
+            - img [ref=e225]
+          - button "Удалить" [ref=e230] [cursor=pointer]:
+            - img [ref=e231]
+          - link "Открыть" [ref=e234] [cursor=pointer]:
+            - /url: /trees/b4c50cf4-c7b1-4e77-8ea8-979797fdc5cf
+            - text: Открыть
+            - img [ref=e235]

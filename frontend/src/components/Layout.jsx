@@ -66,6 +66,9 @@ export default function Layout({ children, fill = false }) {
 
   return (
     <div className="app-shell">
+      {/* ── Skip link (accessibility) ── */}
+      <a href="#main-content" className="skip-link">Перейти к содержимому</a>
+
       {/* ── Mobile top bar ── */}
       <div className="mobile-topbar">
         <button
@@ -121,7 +124,7 @@ export default function Layout({ children, fill = false }) {
         </div>
       </aside>
 
-      <main className={`main-content${fill ? ' main-content--fill' : ''}`}>{children}</main>
+      <main id="main-content" className={`main-content${fill ? ' main-content--fill' : ''}`}>{children}</main>
     </div>
   );
 }

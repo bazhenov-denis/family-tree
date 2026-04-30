@@ -1,0 +1,53 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - img [ref=e6]
+      - generic [ref=e9]: Семейное Древо
+    - navigation [ref=e10]:
+      - link "Мои деревья" [ref=e11] [cursor=pointer]:
+        - /url: /trees
+        - img [ref=e12]
+        - text: Мои деревья
+      - link "Приглашения" [ref=e15] [cursor=pointer]:
+        - /url: /invites
+        - img [ref=e16]
+        - text: Приглашения
+      - link "Профиль" [ref=e19] [cursor=pointer]:
+        - /url: /profile
+        - img [ref=e20]
+        - text: Профиль
+    - generic [ref=e24]:
+      - link "D Пользователь denis.bazhenov2005@yandex.ru" [ref=e25] [cursor=pointer]:
+        - /url: /profile
+        - generic [ref=e26]: D
+        - generic [ref=e27]:
+          - generic [ref=e28]: Пользователь
+          - generic [ref=e29]: denis.bazhenov2005@yandex.ru
+      - button "Тёмная тема" [ref=e30] [cursor=pointer]:
+        - img [ref=e31]
+      - button "Выйти" [ref=e33] [cursor=pointer]:
+        - img [ref=e34]
+  - main [ref=e37]:
+    - generic [ref=e38]:
+      - generic [ref=e39]:
+        - generic [ref=e40]:
+          - link "Деревья" [ref=e41] [cursor=pointer]:
+            - /url: /trees
+            - img [ref=e42]
+            - text: Деревья
+          - img [ref=e44]
+        - generic [ref=e47]:
+          - button "Обновить граф" [ref=e48] [cursor=pointer]:
+            - img [ref=e49]
+          - button "Ещё" [ref=e55] [cursor=pointer]:
+            - img [ref=e56]
+      - generic [ref=e60]:
+        - generic [ref=e61]:
+          - img [ref=e62]
+          - paragraph [ref=e65]: Загрузка...
+        - generic [ref=e66]:
+          - generic [ref=e67] [cursor=pointer]:
+            - img [ref=e68]
+            - generic [ref=e71]: Дни рождения
+            - img [ref=e73]
+          - generic [ref=e76]: Загрузка…

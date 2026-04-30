@@ -62,7 +62,7 @@ public class CommentService {
   public CommentResponse create(UUID treeId, UUID personId, CommentRequest req) {
     User user = currentUserProvider.get();
     TreeMember member = resolveMember(treeId, user);
-    permissionService.checkCanView(member); // commentators and above can post
+    permissionService.checkCanComment(member);
     Person person = resolvePerson(treeId, personId);
 
     Comment comment = new Comment(
@@ -83,8 +83,9 @@ public class CommentService {
     }
 
     boolean isAuthor = comment.getAuthor().getId().equals(user.getId());
-    boolean isOwner  = member.getRole() == TreeRole.OWNER;
-    if (!isAuthor && !isOwner) {
+    boolean canManage = member.getRole() == TreeRole.OWNER
+        || member.getRole() == TreeRole.EDITOR;
+    if (!isAuthor && !canManage) {
       throw new SecurityException("Access denied");
     }
     commentRepository.delete(comment);

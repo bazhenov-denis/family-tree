@@ -1,0 +1,90 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]:
+        - img [ref=e7]
+        - generic [ref=e10]: Семейное Древо
+      - generic [ref=e11]:
+        - link "Войти" [ref=e12] [cursor=pointer]:
+          - /url: /login
+        - link "Регистрация" [ref=e13] [cursor=pointer]:
+          - /url: /register
+  - generic [ref=e15]:
+    - generic [ref=e16]:
+      - img [ref=e17]
+      - text: Сохраните историю своей семьи
+    - heading "Ваше семейное древо онлайн" [level=1] [ref=e19]:
+      - text: Ваше семейное
+      - text: древо онлайн
+    - paragraph [ref=e20]: Создайте интерактивную карту семьи, добавьте фотографии, события и пригласите родственников. Всё в одном месте, навсегда.
+    - generic [ref=e21]:
+      - link "Начать бесплатно" [ref=e22] [cursor=pointer]:
+        - /url: /register
+        - text: Начать бесплатно
+        - img [ref=e23]
+      - link "Уже есть аккаунт" [ref=e25] [cursor=pointer]:
+        - /url: /login
+    - img [ref=e27]:
+      - generic [ref=e30]: ВЫ
+  - generic [ref=e46]:
+    - heading "Всё что нужно для семейной истории" [level=2] [ref=e47]
+    - paragraph [ref=e48]: Удобный инструмент для сохранения и изучения родословной
+    - generic [ref=e49]:
+      - generic [ref=e50]:
+        - img [ref=e52]
+        - heading "Визуальное дерево" [level=3] [ref=e56]
+        - paragraph [ref=e57]: Интерактивный граф с панорамированием, масштабированием и радиальным видом. Связи между поколениями видны с первого взгляда.
+      - generic [ref=e58]:
+        - img [ref=e60]
+        - heading "Совместная работа" [level=3] [ref=e65]
+        - paragraph [ref=e66]: Приглашайте родственников как редакторов или читателей. Каждый может добавлять информацию и фотографии.
+      - generic [ref=e67]:
+        - img [ref=e69]
+        - heading "Фото и медиа" [level=3] [ref=e72]
+        - paragraph [ref=e73]: Загружайте фотографии к карточкам людей. Галерея сохраняет историю в лицах.
+      - generic [ref=e74]:
+        - img [ref=e76]
+        - heading "События и хронология" [level=3] [ref=e78]
+        - paragraph [ref=e79]: Рождения, свадьбы, переезды — все важные события на одной временной шкале.
+      - generic [ref=e80]:
+        - img [ref=e82]
+        - heading "Поиск и путь родства" [level=3] [ref=e85]
+        - paragraph [ref=e86]: Мгновенный поиск по имени. Узнайте кем приходятся друг другу любые два человека.
+      - generic [ref=e87]:
+        - img [ref=e89]
+        - heading "Роли и приватность" [level=3] [ref=e91]
+        - paragraph [ref=e92]: "Гибкая система ролей: Владелец, Редактор, Читатель, Комментатор. Дерево видят только приглашённые."
+  - generic [ref=e94]:
+    - heading "Как начать" [level=2] [ref=e95]
+    - paragraph [ref=e96]: Три простых шага до готового семейного дерева
+    - generic [ref=e97]:
+      - generic [ref=e98]:
+        - generic [ref=e99]: "1"
+        - heading "Создайте дерево" [level=3] [ref=e100]
+        - paragraph [ref=e101]: Дайте дереву название и добавьте первого человека — себя или прародителя.
+      - generic [ref=e102]:
+        - generic [ref=e103]: "2"
+        - heading "Добавьте людей" [level=3] [ref=e104]
+        - paragraph [ref=e105]: "Заполняйте карточки: имя, даты, место рождения, фото, биография."
+      - generic [ref=e106]:
+        - generic [ref=e107]: "3"
+        - heading "Пригласите семью" [level=3] [ref=e108]
+        - paragraph [ref=e109]: Отправьте ссылку-приглашение. Вместе дерево растёт быстрее.
+  - generic [ref=e111]:
+    - img [ref=e112]
+    - heading "Начните сегодня — это бесплатно" [level=2] [ref=e115]
+    - paragraph [ref=e116]: Создайте аккаунт за минуту и сразу приступайте к построению дерева
+    - link "Создать аккаунт" [ref=e117] [cursor=pointer]:
+      - /url: /register
+      - text: Создать аккаунт
+      - img [ref=e118]
+  - contentinfo [ref=e120]:
+    - generic [ref=e121]:
+      - generic [ref=e122]:
+        - img [ref=e123]
+        - generic [ref=e126]: Семейное Древо
+      - generic [ref=e127]:
+        - link "Войти" [ref=e128] [cursor=pointer]:
+          - /url: /login
+        - link "Регистрация" [ref=e129] [cursor=pointer]:
+          - /url: /register

@@ -13,4 +13,7 @@ public interface EventRepository
 
   @Query("SELECT ep.event FROM EventPerson ep WHERE ep.person.id = :personId ORDER BY ep.event.dateFrom ASC NULLS LAST")
   List<Event> findAllByPersonId(UUID personId);
+
+  @Query("SELECT e.tree.id, COUNT(e) FROM Event e WHERE e.tree.id IN :treeIds GROUP BY e.tree.id")
+  List<Object[]> countEventsByTreeIds(List<UUID> treeIds);
 }

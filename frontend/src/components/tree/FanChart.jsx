@@ -108,6 +108,10 @@ export default function FanChart({ graph, loading, onNodeClick }) {
   const dragStart = useRef(null);
   const didDrag   = useRef(false);
 
+  // Touch state
+  const touchStartPos = useRef(null);
+  const pinchStart    = useRef(null);
+
   useEffect(() => { panRef.current  = pan;  }, [pan]);
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
 
@@ -157,6 +161,68 @@ export default function FanChart({ graph, loading, onNodeClick }) {
   }
   function onMouseUp() { setDragging(false); }
 
+  // ── Touch handlers ──
+  function getTouchDist(e) {
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    return Math.hypot(dx, dy);
+  }
+
+  function onTouchStart(e) {
+    if (e.touches.length === 1) {
+      touchStartPos.current = {
+        x: e.touches[0].clientX - panRef.current.x,
+        y: e.touches[0].clientY - panRef.current.y,
+      };
+      didDrag.current = false;
+    } else if (e.touches.length === 2) {
+      e.preventDefault();
+      pinchStart.current = {
+        dist: getTouchDist(e),
+        zoom: zoomRef.current,
+        pan: { ...panRef.current },
+        cx: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        cy: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+      };
+    }
+  }
+
+  function onTouchMove(e) {
+    if (e.touches.length === 1 && touchStartPos.current) {
+      const dx = e.touches[0].clientX - touchStartPos.current.x;
+      const dy = e.touches[0].clientY - touchStartPos.current.y;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDrag.current = true;
+      setPan({ x: dx, y: dy });
+    } else if (e.touches.length === 2 && pinchStart.current) {
+      e.preventDefault();
+      const newDist = getTouchDist(e);
+      const scale = newDist / pinchStart.current.dist;
+      const newZoom = Math.min(3, Math.max(0.1, pinchStart.current.zoom * scale));
+      const rect = containerRef.current.getBoundingClientRect();
+      const cx = pinchStart.current.cx - rect.left;
+      const cy = pinchStart.current.cy - rect.top;
+      const ratio = newZoom / pinchStart.current.zoom;
+      setZoom(newZoom);
+      setPan({
+        x: cx - (cx - pinchStart.current.pan.x) * ratio,
+        y: cy - (cy - pinchStart.current.pan.y) * ratio,
+      });
+    }
+  }
+
+  function onTouchEnd(e) {
+    if (e.touches.length === 0) {
+      touchStartPos.current = null;
+      pinchStart.current = null;
+    } else if (e.touches.length === 1 && pinchStart.current) {
+      pinchStart.current = null;
+      touchStartPos.current = {
+        x: e.touches[0].clientX - panRef.current.x,
+        y: e.touches[0].clientY - panRef.current.y,
+      };
+    }
+  }
+
   function fitToScreen() {
     if (!fanData || !containerRef.current) return;
     const { clientWidth: cw, clientHeight: ch } = containerRef.current;
@@ -196,11 +262,14 @@ export default function FanChart({ graph, loading, onNodeClick }) {
     <div
       ref={containerRef}
       className="graph-container"
-      style={{ cursor: dragging ? 'grabbing' : 'grab' }}
+      style={{ cursor: dragging ? 'grabbing' : 'grab', touchAction: 'none' }}
       onMouseDown={onMouseDown}
       onMouseMove={onMouseMove}
       onMouseUp={onMouseUp}
       onMouseLeave={onMouseUp}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
     >
       <svg className="graph-svg">
         {/* Top-level defs: background pattern */}

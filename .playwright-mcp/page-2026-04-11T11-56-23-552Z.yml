@@ -1,0 +1,66 @@
+- generic [ref=e547]:
+  - complementary [ref=e548]:
+    - generic [ref=e549]:
+      - img [ref=e550]
+      - generic [ref=e553]: Семейное Древо
+    - navigation [ref=e554]:
+      - link "Мои деревья" [ref=e555] [cursor=pointer]:
+        - /url: /trees
+        - img [ref=e556]
+        - text: Мои деревья
+      - link "Приглашения" [ref=e559] [cursor=pointer]:
+        - /url: /invites
+        - img [ref=e560]
+        - text: Приглашения
+      - link "Профиль" [ref=e563] [cursor=pointer]:
+        - /url: /profile
+        - img [ref=e564]
+        - text: Профиль
+    - generic [ref=e568]:
+      - link "D Пользователь denis.bazhenov2005@yandex.ru" [ref=e569] [cursor=pointer]:
+        - /url: /profile
+        - generic [ref=e570]: D
+        - generic [ref=e571]:
+          - generic [ref=e572]: Пользователь
+          - generic [ref=e573]: denis.bazhenov2005@yandex.ru
+      - button "Тёмная тема" [ref=e574] [cursor=pointer]:
+        - img [ref=e575]
+      - button "Выйти" [ref=e577] [cursor=pointer]:
+        - img [ref=e578]
+  - main [ref=e581]:
+    - generic [ref=e583]:
+      - heading "Профиль" [level=1] [ref=e584]
+      - paragraph [ref=e585]: Управление учётной записью
+    - generic [ref=e586]:
+      - generic [ref=e587]:
+        - generic [ref=e588]:
+          - img [ref=e589]
+          - text: Основные данные
+        - generic [ref=e592]:
+          - generic [ref=e593]: D
+          - generic [ref=e594]:
+            - generic [ref=e595]: —
+            - generic [ref=e596]: denis.bazhenov2005@yandex.ru
+        - generic [ref=e597]:
+          - generic [ref=e598]:
+            - generic [ref=e599]: Email
+            - textbox [disabled] [ref=e600]: denis.bazhenov2005@yandex.ru
+          - generic [ref=e601]:
+            - generic [ref=e602]: Отображаемое имя
+            - textbox "Иван Иванов" [ref=e603]
+          - button "Сохранить" [ref=e605] [cursor=pointer]
+      - generic [ref=e606]:
+        - generic [ref=e607]:
+          - img [ref=e608]
+          - text: Смена пароля
+        - generic [ref=e611]:
+          - generic [ref=e612]:
+            - generic [ref=e613]: Текущий пароль
+            - textbox [ref=e614]
+          - generic [ref=e615]:
+            - generic [ref=e616]: Новый пароль
+            - textbox "Минимум 6 символов" [ref=e617]
+          - generic [ref=e618]:
+            - generic [ref=e619]: Подтвердите новый пароль
+            - textbox [ref=e620]
+          - button "Изменить пароль" [disabled] [ref=e622]

@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { UserMinus, ChevronDown } from 'lucide-react';
+import { UserMinus, ChevronDown, GitBranch } from 'lucide-react';
 import { changeMemberRole, removeMember } from '../../api/members.js';
 import { useToast } from '../../context/ToastContext.jsx';
+import BranchPermissionModal from './BranchPermissionModal.jsx';
 
-const ROLES = ['EDITOR', 'VIEWER'];
+const ROLES = ['EDITOR', 'COMMENTATOR', 'VIEWER'];
 const ROLE_LABELS = { OWNER: 'Владелец', EDITOR: 'Редактор', VIEWER: 'Читатель', COMMENTATOR: 'Комментатор' };
 
 export default function MemberList({ treeId, members, currentUserId, onRefresh }) {
   const toast = useToast();
   const [busy, setBusy] = useState({});
+  const [branchModal, setBranchModal] = useState(null); // { memberId, memberName }
 
   async function handleRoleChange(userId, role) {
     setBusy(b => ({ ...b, [userId]: true }));
@@ -42,6 +44,7 @@ export default function MemberList({ treeId, members, currentUserId, onRefresh }
   }
 
   return (
+    <>
     <ul className="member-list">
       {members.map((m) => {
         const isSelf = m.userId === currentUserId;
@@ -74,6 +77,16 @@ export default function MemberList({ treeId, members, currentUserId, onRefresh }
                     <ChevronDown size={14} className="select-icon" />
                   </div>
 
+                  {m.role === 'EDITOR' && (
+                    <button
+                      className="icon-btn"
+                      onClick={() => setBranchModal({ memberId: m.memberId, memberName: m.email })}
+                      title="Настроить ветви"
+                    >
+                      <GitBranch size={16} />
+                    </button>
+                  )}
+
                   <button
                     className="icon-btn danger"
                     disabled={busy[m.userId]}
@@ -89,5 +102,14 @@ export default function MemberList({ treeId, members, currentUserId, onRefresh }
         );
       })}
     </ul>
+
+    {branchModal && (
+      <BranchPermissionModal
+        treeId={treeId}
+        memberId={branchModal.memberId}
+        onClose={() => setBranchModal(null)}
+      />
+    )}
+    </>
   );
 }
