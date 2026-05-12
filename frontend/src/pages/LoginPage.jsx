@@ -1,16 +1,21 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Trees, Eye, EyeOff } from 'lucide-react';
-import { login } from '../api/auth.js';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Trees, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { login, resendVerification } from '../api/auth.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import Spinner from '../components/ui/Spinner.jsx';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
+  const [searchParams] = useSearchParams();
+  const redirect = searchParams.get('redirect');
+  const invitedEmail = searchParams.get('email') || '';
+  const [email, setEmail] = useState(invitedEmail);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const { login: authLogin } = useAuth();
   const navigate = useNavigate();
 
@@ -18,14 +23,31 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setNotice('');
     try {
       const res = await login({ email, password });
       authLogin(res.accessToken, { email });
-      navigate('/trees');
+      navigate(redirect || '/trees', { replace: true });
     } catch (err) {
       setError(err.message || 'Неверный email или пароль');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleResend() {
+    if (!email.trim()) { setError('Укажите email'); return; }
+
+    setResending(true);
+    setError('');
+    setNotice('');
+    try {
+      const res = await resendVerification({ email });
+      setNotice(res.message || 'Письмо отправлено повторно');
+    } catch (err) {
+      setError(err.message || 'Не удалось отправить письмо');
+    } finally {
+      setResending(false);
     }
   }
 
@@ -100,14 +122,21 @@ export default function LoginPage() {
             </div>
 
             {error && <div className="form-error">{error}</div>}
+            {notice && <div className="form-success">{notice}</div>}
 
             <button type="submit" className="btn btn-primary btn-full" disabled={loading}>
               {loading ? <Spinner size={18} /> : 'Войти'}
             </button>
+            {error.includes('Подтвердите email') && (
+              <button type="button" className="btn btn-ghost btn-full" onClick={handleResend} disabled={resending}>
+                {resending ? <Spinner size={18} /> : <RefreshCw size={16} />}
+                Отправить письмо ещё раз
+              </button>
+            )}
           </form>
 
           <p className="auth-footer">
-            Нет аккаунта? <Link to="/register">Зарегистрироваться</Link>
+            Нет аккаунта? <Link to={redirect ? `/register?redirect=${encodeURIComponent(redirect)}` : '/register'}>Зарегистрироваться</Link>
           </p>
         </div>
       </div>

@@ -6,6 +6,7 @@ import com.example.backend.event.entity.EventPersonId;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -15,6 +16,10 @@ public interface EventPersonRepository
   void deleteAllByEvent(Event event);
 
   List<EventPerson> findAllByEvent(Event event);
+
+  @Modifying
+  @Query("DELETE FROM EventPerson ep WHERE ep.event.tree.id = :treeId")
+  void deleteAllByEventTreeId(@Param("treeId") UUID treeId);
 
   @Query("SELECT ep FROM EventPerson ep JOIN FETCH ep.event e JOIN FETCH ep.person p WHERE e.tree.id = :treeId ORDER BY e.dateFrom ASC NULLS LAST")
   List<EventPerson> findAllByTreeIdWithDetails(@Param("treeId") UUID treeId);

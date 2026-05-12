@@ -8,7 +8,6 @@ const CIRCLE_CX   = CARD_W / 2;  // 77.5
 const CIRCLE_CY   = 50;   // circle center Y
 const NAME_Y      = 115;  // first name line
 const YEARS_Y     = 148;  // years text
-const COLLAPSE_Y  = 160;  // collapse button Y
 const MM_W        = 180;
 const MM_H        = 108;
 
@@ -82,22 +81,40 @@ function Connections({ spousePairs, families, customEdges, pos, animated, zoom }
   const lp = { stroke: CONN_CLR, strokeWidth: sw, strokeLinecap: 'round' };
   const lines = [];
 
-  // Spouse: horizontal line at card vertical-center, drawn center-to-center.
+  function pushLine(key, x1, y1, x2, y2, props = {}) {
+    const length = Math.max(1, Math.hypot(x2 - x1, y2 - y1));
+    const style = animated && !props.strokeDasharray
+      ? {
+          '--conn-len': length,
+          strokeDasharray: length,
+          strokeDashoffset: length,
+        }
+      : undefined;
+
+    lines.push(
+      <line
+        key={key}
+        x1={x1}
+        y1={y1}
+        x2={x2}
+        y2={y2}
+        {...lp}
+        {...props}
+        style={style}
+        className={animated && !props.strokeDasharray ? 'graph-connection-animated' : undefined}
+      />
+    );
+  }
+
+  // Spouse: single horizontal line at card vertical-center.
   for (const { id, a, b } of spousePairs) {
     const pa = pos.get(a);
     const pb = pos.get(b);
     if (!pa || !pb) continue;
-    const y  = pa.y + CARD_H / 2;
-    const ax = pa.x + CARD_W / 2;
-    const bx = pb.x + CARD_W / 2;
-    lines.push(
-      <line key={`sp-${id}`}
-        x1={Math.min(ax, bx)} y1={y}
-        x2={Math.max(ax, bx)} y2={y}
-        {...lp}
-        className={animated ? 'graph-connection-animated' : undefined}
-      />
-    );
+    const y   = pa.y + CARD_H / 2;
+    const ax  = pa.x + CARD_W / 2;
+    const bx  = pb.x + CARD_W / 2;
+    pushLine(`sp-${id}`, Math.min(ax, bx), y, Math.max(ax, bx), y);
   }
 
   // Parent→children: orthogonal elbow + bar + stubs
@@ -112,21 +129,21 @@ function Connections({ spousePairs, families, customEdges, pos, animated, zoom }
     const childTop     = Math.min(...cpos.map(p => p.y));
     const midY         = (parentBottom + childTop) / 2;
 
-    lines.push(<line key={`tr-${parents.join('-')}`} x1={trunkX} y1={trunkTopY} x2={trunkX} y2={midY} {...lp} className={animated ? 'graph-connection-animated' : undefined} />);
+    pushLine(`tr-${parents.join('-')}`, trunkX, trunkTopY, trunkX, midY);
 
     const childXs = children.map(id => { const p = pos.get(id); return p ? p.x + CARD_W / 2 : null; }).filter(x => x !== null);
     const barLeft  = Math.min(trunkX, ...childXs);
     const barRight = Math.max(trunkX, ...childXs);
 
     if (barRight > barLeft + 1) {
-      lines.push(<line key={`bar-${parents.join('-')}`} x1={barLeft} y1={midY} x2={barRight} y2={midY} {...lp} className={animated ? 'graph-connection-animated' : undefined} />);
+      pushLine(`bar-${parents.join('-')}`, barLeft, midY, barRight, midY);
     }
 
     for (const cid of children) {
       const cp = pos.get(cid);
       if (!cp) continue;
       const cx = cp.x + CARD_W / 2;
-      lines.push(<line key={`stub-${cid}`} x1={cx} y1={midY} x2={cx} y2={cp.y} {...lp} className={animated ? 'graph-connection-animated' : undefined} />);
+      pushLine(`stub-${cid}`, cx, midY, cx, cp.y);
     }
   }
 
@@ -136,17 +153,37 @@ function Connections({ spousePairs, families, customEdges, pos, animated, zoom }
     const pa = pos.get(e.from);
     const pb = pos.get(e.to);
     if (!pa || !pb) continue;
-    lines.push(
-      <line key={`cu-${e.id}`}
-        x1={pa.x + CARD_W / 2} y1={pa.y + CARD_H / 2}
-        x2={pb.x + CARD_W / 2} y2={pb.y + CARD_H / 2}
-        stroke={CONN_CLR} strokeWidth={csw} strokeDasharray={`${5 / zoom} ${5 / zoom}`}
-        className={animated ? 'graph-connection-animated' : undefined}
-      />
+    pushLine(
+      `cu-${e.id}`,
+      pa.x + CARD_W / 2,
+      pa.y + CARD_H / 2,
+      pb.x + CARD_W / 2,
+      pb.y + CARD_H / 2,
+      {
+        stroke: CONN_CLR,
+        strokeWidth: csw,
+        strokeDasharray: `${5 / zoom} ${5 / zoom}`,
+      }
     );
   }
 
   return <g>{lines}</g>;
+}
+
+// ── Descendants traversal (for branch collapse) ────────────────
+function getDescendants(nodeId, edges) {
+  const result = new Set();
+  const queue  = [nodeId];
+  while (queue.length) {
+    const id = queue.shift();
+    for (const e of edges) {
+      if (GEN_TYPES.has(e.type) && e.from === id && !result.has(e.to)) {
+        result.add(e.to);
+        queue.push(e.to);
+      }
+    }
+  }
+  return result;
 }
 
 // ── Quick-add button (single, below card) ───────────────────────
@@ -171,38 +208,16 @@ function QABtn({ x, y, borderColor, onClick }) {
   );
 }
 
-// ── Collapse toggle button ───────────────────────────────────────
-function CollapseBtn({ cx, y, collapsed, count, onClick }) {
-  return (
-    <g
-      transform={`translate(${cx},${y})`}
-      style={{ cursor: 'pointer' }}
-      onMouseDown={e => e.stopPropagation()}
-      onClick={e => { e.stopPropagation(); onClick(); }}
-    >
-      <title>{collapsed ? `Развернуть (скрыто: ${count})` : 'Свернуть ветвь'}</title>
-      <circle r={11} fill={collapsed ? '#6366f1' : 'white'} stroke={collapsed ? '#6366f1' : '#94a3b8'} strokeWidth={1.5} />
-      <text
-        textAnchor="middle" dominantBaseline="central"
-        fontSize={collapsed ? 11 : 15} fontWeight={700}
-        fill={collapsed ? 'white' : '#94a3b8'}
-        style={{ pointerEvents: 'none' }}
-      >
-        {collapsed ? (count > 9 ? '9+' : String(count || '+')) : '▾'}
-      </text>
-    </g>
-  );
-}
-
 // ── Person card (circular) ──────────────────────────────────────
 // Bounding box: (p.x, p.y) → (p.x+CARD_W, p.y+CARD_H)
 // Circle centered at (CIRCLE_CX, CIRCLE_CY) with radius CIRCLE_R
-// Name below circle, years below name, collapse button at bottom
-function PersonCard({ node, p, isHovered, isSelected, canEdit, hasChildren, isCollapsed, descendantCount, onHover, onLeave, onClick, onQuickAdd, onToggleCollapse, didDrag }) {
+// Name below circle, years below name
+function PersonCard({ node, p, isHovered, isSelected, canEdit, onHover, onLeave, onClick, onQuickAdd, didDrag, hasChildren, isCollapsed, onCollapse }) {
   const pal      = PALETTE[node.gender] || PAL_DEFAULT;
   const clipId   = `clip-${node.id}`;
   const shadowId = isSelected ? 'f-sel' : isHovered ? 'f-hov' : 'f-nor';
   const scale    = isHovered ? 1.06 : 1;
+  const quickAddY = YEARS_Y + 22;
 
   // Split name across up to 2 lines
   const parts  = (node.fullName || '?').split(' ').filter(Boolean);
@@ -229,6 +244,16 @@ function PersonCard({ node, p, isHovered, isSelected, canEdit, hasChildren, isCo
       onMouseLeave={onLeave}
       onClick={() => { if (!didDrag.current) onClick(node); }}
     >
+      {canEdit && (
+        <rect
+          x={CIRCLE_CX - CIRCLE_R - 6}
+          y={0}
+          width={CIRCLE_R * 2 + 12}
+          height={quickAddY + 20}
+          fill="transparent"
+        />
+      )}
+
       {/* Circle with shadow */}
       <circle
         cx={CIRCLE_CX} cy={CIRCLE_CY} r={CIRCLE_R}
@@ -279,17 +304,6 @@ function PersonCard({ node, p, isHovered, isSelected, canEdit, hasChildren, isCo
         </text>
       )}
 
-      {/* Collapse toggle */}
-      {hasChildren && (
-        <CollapseBtn
-          cx={CIRCLE_CX}
-          y={COLLAPSE_Y}
-          collapsed={isCollapsed}
-          count={descendantCount}
-          onClick={() => onToggleCollapse(node.id)}
-        />
-      )}
-
       {/* Mobile quick-add button (top-right of circle) — visible only on touch devices via CSS */}
       {canEdit && (
         <g
@@ -314,10 +328,30 @@ function PersonCard({ node, p, isHovered, isSelected, canEdit, hasChildren, isCo
       {isHovered && canEdit && (
         <QABtn
           x={CIRCLE_CX}
-          y={hasChildren ? COLLAPSE_Y + 30 : YEARS_Y + 28}
+          y={quickAddY}
           borderColor={pal.border}
           onClick={() => onQuickAdd(node)}
         />
+      )}
+
+      {/* Branch collapse/expand button ▼/▶ (spec 4.5) */}
+      {hasChildren && (
+        <g
+          transform={`translate(${CIRCLE_CX},${CARD_H + 18})`}
+          style={{ cursor: 'pointer' }}
+          onMouseDown={e => e.stopPropagation()}
+          onClick={e => { e.stopPropagation(); onCollapse(node.id); }}
+        >
+          <title>{isCollapsed ? 'Развернуть ветвь' : 'Свернуть ветвь'}</title>
+          <circle r={11} fill={pal.bg} stroke={pal.border} strokeWidth={1.5} />
+          <text
+            textAnchor="middle" dominantBaseline="central"
+            fontSize={13} fill={pal.border}
+            style={{ pointerEvents: 'none', userSelect: 'none' }}
+          >
+            {isCollapsed ? '▶' : '▼'}
+          </text>
+        </g>
       )}
     </g>
   );
@@ -376,6 +410,7 @@ export default function TreeGraph({ graph, loading, onNodeClick, onQuickAdd, can
   const [dragging, setDragging] = useState(false);
   const [hoveredId, setHoveredId] = useState(null);
   const [dims, setDims] = useState({ w: 800, h: 600 });
+  const [collapsed, setCollapsed] = useState(new Set());
 
   const panRef   = useRef(pan);
   const zoomRef  = useRef(zoom);
@@ -386,57 +421,34 @@ export default function TreeGraph({ graph, loading, onNodeClick, onQuickAdd, can
   const touchStartPos = useRef(null);   // { x, y } for single-finger pan
   const pinchStart    = useRef(null);   // { dist, zoom, pan } for pinch-to-zoom
 
-  const [collapsedIds, setCollapsedIds] = useState(new Set());
-
   useEffect(() => { panRef.current  = pan;  }, [pan]);
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
-  // Reset collapsed state when graph is refreshed
-  useEffect(() => { setCollapsedIds(new Set()); }, [graph]);
+  // Reset collapse state when the graph changes (different tree loaded)
+  useEffect(() => { setCollapsed(new Set()); }, [graph]);
 
-  // Nodes that have at least one child via generational edges
-  const parentIds = new Set();
-  if (graph) {
-    for (const e of graph.edges) {
-      if (GEN_TYPES.has(e.type)) parentIds.add(e.from);
-    }
+  // Nodes that have children in the full (unfiltered) graph
+  const allEdges = graph?.edges ?? [];
+  const nodesWithChildren = new Set();
+  for (const e of allEdges) {
+    if (GEN_TYPES.has(e.type)) nodesWithChildren.add(e.from);
   }
 
-  // Compute all descendants of a set of collapsed node IDs
-  function computeHidden(collapsedSet) {
-    if (!graph || !collapsedSet.size) return new Set();
-    const hidden = new Set();
-    const queue  = [...collapsedSet];
-    while (queue.length) {
-      const pid = queue.shift();
-      for (const e of graph.edges) {
-        if (GEN_TYPES.has(e.type) && e.from === pid && !hidden.has(e.to)) {
-          hidden.add(e.to);
-          queue.push(e.to);
-        }
-        // Also hide spouses of hidden nodes
-        if (e.type === 'SPOUSE' && hidden.has(pid) && !hidden.has(e.to)) {
-          hidden.add(e.to);
-        }
-      }
-    }
-    return hidden;
+  // Compute nodes hidden due to collapsed ancestors
+  const hiddenNodes = new Set();
+  for (const nodeId of collapsed) {
+    for (const d of getDescendants(nodeId, allEdges)) hiddenNodes.add(d);
   }
 
-  function countDescendants(nodeId) {
-    return computeHidden(new Set([nodeId])).size;
-  }
+  const visibleNodes = (graph?.nodes ?? []).filter(n => !hiddenNodes.has(n.id));
+  const visibleEdges = allEdges.filter(e => !hiddenNodes.has(e.from) && !hiddenNodes.has(e.to));
 
   function toggleCollapse(nodeId) {
-    setCollapsedIds(prev => {
+    setCollapsed(prev => {
       const next = new Set(prev);
       if (next.has(nodeId)) next.delete(nodeId); else next.add(nodeId);
       return next;
     });
   }
-
-  const hiddenIds    = computeHidden(collapsedIds);
-  const visibleNodes = graph ? graph.nodes.filter(n => !hiddenIds.has(n.id)) : [];
-  const visibleEdges = graph ? graph.edges.filter(e => !hiddenIds.has(e.from) && !hiddenIds.has(e.to)) : [];
 
   // Compute layout from visible nodes only
   const layout = visibleNodes.length
@@ -510,7 +522,8 @@ export default function TreeGraph({ graph, loading, onNodeClick, onQuickAdd, can
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
       const oldZoom = zoomRef.current;
-      const factor  = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+      const delta = Math.max(-120, Math.min(120, e.deltaY));
+      const factor = Math.exp(-delta * 0.00055);
       const newZoom = Math.min(5, Math.max(0.01, oldZoom * factor));
       const ratio   = newZoom / oldZoom;
       setZoom(newZoom);
@@ -529,7 +542,7 @@ export default function TreeGraph({ graph, loading, onNodeClick, onQuickAdd, can
       svg.removeEventListener('wheel', handler);
       el.removeEventListener('wheel', handler);
     };
-  }, []);
+  }, [loading, graph]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function onMouseDown(e) {
     if (e.button !== 0) return;
@@ -549,6 +562,10 @@ export default function TreeGraph({ graph, loading, onNodeClick, onQuickAdd, can
     const dx = e.touches[0].clientX - e.touches[1].clientX;
     const dy = e.touches[0].clientY - e.touches[1].clientY;
     return Math.hypot(dx, dy);
+  }
+
+  function dampPinchScale(rawScale) {
+    return Math.pow(rawScale, 0.45);
   }
 
   function onTouchStart(e) {
@@ -585,7 +602,7 @@ export default function TreeGraph({ graph, loading, onNodeClick, onQuickAdd, can
       // Pinch-to-zoom
       e.preventDefault();
       const newDist = getTouchDist(e);
-      const scale = newDist / pinchStart.current.dist;
+      const scale = dampPinchScale(newDist / pinchStart.current.dist);
       const newZoom = Math.min(2.5, Math.max(0.15, pinchStart.current.zoom * scale));
 
       const rect = containerRef.current.getBoundingClientRect();
@@ -725,15 +742,14 @@ export default function TreeGraph({ graph, loading, onNodeClick, onQuickAdd, can
                 isHovered={hoveredId === node.id}
                 isSelected={selectedNodeId === node.id}
                 canEdit={!!canEdit}
-                hasChildren={parentIds.has(node.id)}
-                isCollapsed={collapsedIds.has(node.id)}
-                descendantCount={collapsedIds.has(node.id) ? countDescendants(node.id) : 0}
                 onHover={() => setHoveredId(node.id)}
                 onLeave={() => setHoveredId(null)}
                 onClick={onNodeClick || (() => {})}
                 onQuickAdd={onQuickAdd || (() => {})}
-                onToggleCollapse={toggleCollapse}
                 didDrag={didDrag}
+                hasChildren={nodesWithChildren.has(node.id)}
+                isCollapsed={collapsed.has(node.id)}
+                onCollapse={toggleCollapse}
               />
             );
           })}

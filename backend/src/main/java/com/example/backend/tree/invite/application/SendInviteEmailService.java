@@ -5,13 +5,16 @@ import com.example.backend.tree.invite.entity.InviteToken;
 import com.example.backend.tree.invite.entity.TreeInvite;
 import com.example.backend.tree.invite.repository.InviteTokenRepository;
 import java.time.Duration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SendInviteEmailService {
+
+  private static final Logger log = LoggerFactory.getLogger(SendInviteEmailService.class);
 
   private final InviteTokenRepository tokenRepository;
   private final EmailSender emailSender;
@@ -27,13 +30,13 @@ public class SendInviteEmailService {
     this.appUrl = appUrl;
   }
 
-  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  @Transactional
   public void send(TreeInvite invite) {
 
     InviteToken token = InviteToken.create(invite, Duration.ofDays(7));
     tokenRepository.save(token);
 
-    String link = appUrl + "/invites/" + token.getToken();
+    String link = appUrl + "/invite/" + token.getToken();
 
     String body = """
                 Вас пригласили в семейное дерево "%s"
@@ -49,10 +52,14 @@ public class SendInviteEmailService {
         link
     );
 
-    emailSender.send(
-        invite.getEmail(),
-        "Приглашение в семейное дерево",
-        body
-    );
+    try {
+      emailSender.send(
+          invite.getEmail(),
+          "Приглашение в семейное дерево",
+          body
+      );
+    } catch (Exception e) {
+      log.error("Failed to send invite email to {}: {}", invite.getEmail(), e.getMessage());
+    }
   }
 }

@@ -24,6 +24,7 @@ import com.example.backend.version.entity.VersionEntity;
 import com.example.backend.version.repository.VersionEntityRepository;
 import com.example.backend.version.repository.VersionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -100,18 +101,18 @@ public class SnapshotService {
   private void serializePersons(Version snapshot, UUID treeId) {
     for (Person p : personRepository.findAllByTreeId(treeId)) {
       try {
-        String json = objectMapper.writeValueAsString(Map.of(
-            "id", p.getId(),
-            "firstName", p.getFirstName(),
-            "lastName", p.getLastName(),
-            "gender", p.getGender(),
-            "birthDate", p.getBirthDate(),
-            "deathDate", p.getDeathDate(),
-            "birthPlace", p.getBirthPlace(),
-            "deathPlace", p.getDeathPlace(),
-            "bio", p.getBio(),
-            "photoUrl", p.getPhotoUrl()
-        ));
+        Map<String, Object> data = new HashMap<>();
+        data.put("id", p.getId());
+        data.put("firstName", p.getFirstName());
+        data.put("lastName", p.getLastName());
+        data.put("gender", p.getGender());
+        data.put("birthDate", dateString(p.getBirthDate()));
+        data.put("deathDate", dateString(p.getDeathDate()));
+        data.put("birthPlace", p.getBirthPlace());
+        data.put("deathPlace", p.getDeathPlace());
+        data.put("bio", p.getBio());
+        data.put("photoUrl", p.getPhotoUrl());
+        String json = objectMapper.writeValueAsString(data);
         versionEntityRepository.save(VersionEntity.create(snapshot, "PERSON", p.getId(), json));
       } catch (Exception e) {
         throw new RuntimeException("Failed to serialize person " + p.getId(), e);
@@ -122,12 +123,12 @@ public class SnapshotService {
   private void serializeRelationships(Version snapshot, UUID treeId) {
     for (Relationship r : relationshipRepository.findAllByTreeId(treeId)) {
       try {
-        String json = objectMapper.writeValueAsString(Map.of(
-            "id", r.getId(),
-            "fromPersonId", r.getFromPerson().getId(),
-            "toPersonId", r.getToPerson().getId(),
-            "type", r.getType().name()
-        ));
+        Map<String, Object> data = new HashMap<>();
+        data.put("id", r.getId());
+        data.put("fromPersonId", r.getFromPerson().getId());
+        data.put("toPersonId", r.getToPerson().getId());
+        data.put("type", r.getType().name());
+        String json = objectMapper.writeValueAsString(data);
         versionEntityRepository.save(VersionEntity.create(snapshot, "RELATIONSHIP", r.getId(), json));
       } catch (Exception e) {
         throw new RuntimeException("Failed to serialize relationship " + r.getId(), e);
@@ -141,14 +142,14 @@ public class SnapshotService {
         List<UUID> personIds = eventPersonRepository.findAllByEvent(e).stream()
             .map(ep -> ep.getPerson().getId())
             .toList();
-        String json = objectMapper.writeValueAsString(Map.of(
-            "id", e.getId(),
-            "type", e.getType(),
-            "title", e.getTitle(),
-            "dateFrom", e.getDateFrom(),
-            "dateTo", e.getDateTo(),
-            "personIds", personIds
-        ));
+        Map<String, Object> data = new HashMap<>();
+        data.put("id", e.getId());
+        data.put("type", e.getType());
+        data.put("title", e.getTitle());
+        data.put("dateFrom", dateString(e.getDateFrom()));
+        data.put("dateTo", dateString(e.getDateTo()));
+        data.put("personIds", personIds);
+        String json = objectMapper.writeValueAsString(data);
         versionEntityRepository.save(VersionEntity.create(snapshot, "EVENT", e.getId(), json));
       } catch (Exception ex) {
         throw new RuntimeException("Failed to serialize event " + e.getId(), ex);
@@ -159,15 +160,15 @@ public class SnapshotService {
   private void serializeMedia(Version snapshot, UUID treeId) {
     for (Media m : mediaRepository.findAllByTreeIdOrderByCreatedAtAsc(treeId)) {
       try {
-        String json = objectMapper.writeValueAsString(Map.of(
-            "id", m.getId(),
-            "personId", m.getPerson() != null ? m.getPerson().getId() : null,
-            "eventId", m.getEvent() != null ? m.getEvent().getId() : null,
-            "url", m.getUrl(),
-            "description", m.getDescription(),
-            "mimeType", m.getMimeType(),
-            "fileName", m.getFileName()
-        ));
+        Map<String, Object> data = new HashMap<>();
+        data.put("id", m.getId());
+        data.put("personId", m.getPerson() != null ? m.getPerson().getId() : null);
+        data.put("eventId", m.getEvent() != null ? m.getEvent().getId() : null);
+        data.put("url", m.getUrl());
+        data.put("description", m.getDescription());
+        data.put("mimeType", m.getMimeType());
+        data.put("fileName", m.getFileName());
+        String json = objectMapper.writeValueAsString(data);
         versionEntityRepository.save(VersionEntity.create(snapshot, "MEDIA", m.getId(), json));
       } catch (Exception e) {
         throw new RuntimeException("Failed to serialize media " + m.getId(), e);
@@ -196,5 +197,9 @@ public class SnapshotService {
         v.getId(), v.getName(), v.getDescription(), v.getType().name(),
         v.getState().name(), v.getParentId(), v.getBaseSnapshotId(),
         v.getCreatedAt(), v.getCreatedBy() != null ? v.getCreatedBy().getEmail() : null, count);
+  }
+
+  private static String dateString(java.time.LocalDate date) {
+    return date != null ? date.toString() : null;
   }
 }

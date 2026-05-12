@@ -48,3 +48,15 @@ export function resolveConflict(treeId, versionId, data) {
 export function completeMerge(treeId, versionId) {
   return client.request(`/api/trees/${treeId}/versions/${versionId}/merge/complete`, { method: 'POST' });
 }
+
+export function restoreSnapshot(treeId, versionId) {
+  return client.request(`/api/trees/${treeId}/versions/${versionId}/restore`, { method: 'POST' });
+}
+
+export function getVersionPreview(treeId, versionId) {
+  return client.request(`/api/trees/${treeId}/versions/${versionId}/preview`);
+}
+
+export function getWorkingCopyContext(treeId) {
+  return client.request(`/api/trees/${treeId}/versions/context`);
+}

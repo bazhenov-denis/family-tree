@@ -146,7 +146,7 @@ export default function FanChart({ graph, loading, onNodeClick }) {
     };
     el.addEventListener('wheel', handler, { passive: false });
     return () => el.removeEventListener('wheel', handler);
-  }, []);
+  }, [loading, graph]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function onMouseDown(e) {
     if (e.button !== 0) return;
@@ -166,6 +166,10 @@ export default function FanChart({ graph, loading, onNodeClick }) {
     const dx = e.touches[0].clientX - e.touches[1].clientX;
     const dy = e.touches[0].clientY - e.touches[1].clientY;
     return Math.hypot(dx, dy);
+  }
+
+  function dampPinchScale(rawScale) {
+    return Math.pow(rawScale, 0.45);
   }
 
   function onTouchStart(e) {
@@ -196,7 +200,7 @@ export default function FanChart({ graph, loading, onNodeClick }) {
     } else if (e.touches.length === 2 && pinchStart.current) {
       e.preventDefault();
       const newDist = getTouchDist(e);
-      const scale = newDist / pinchStart.current.dist;
+      const scale = dampPinchScale(newDist / pinchStart.current.dist);
       const newZoom = Math.min(3, Math.max(0.1, pinchStart.current.zoom * scale));
       const rect = containerRef.current.getBoundingClientRect();
       const cx = pinchStart.current.cx - rect.left;

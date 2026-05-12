@@ -1,27 +1,24 @@
 import { useState, useEffect } from 'react';
-import { X, Camera, GitBranch, ArrowLeftRight, Trash2, GitMerge, RotateCcw, Plus } from 'lucide-react';
-import { listVersions, deleteVersion, discardWorkingCopy } from '../../api/versions';
+import { X, Camera, GitBranch, Trash2, GitMerge, Plus, Eye, CheckCircle2 } from 'lucide-react';
+import { listVersions, deleteVersion } from '../../api/versions';
 import CreateSnapshotModal from './CreateSnapshotModal';
 import CreateWorkingCopyModal from './CreateWorkingCopyModal';
 import MergeWizard from './MergeWizard';
-
-const TYPE_ICONS = {
-  SNAPSHOT: { icon: Camera, label: 'Снапшот', color: '#8b5cf6' },
-  WORKING_COPY: { icon: GitBranch, label: 'Рабочая копия', color: '#3b82f6' },
-  MAIN: { icon: GitBranch, label: 'Основная', color: '#16a34a' },
-};
+import SnapshotPreviewModal from './SnapshotPreviewModal';
+import WorkingCopyDetailModal from './WorkingCopyDetailModal';
 
 export default function VersionsPanel({ treeId, onClose, onRefresh }) {
   const [versions, setVersions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showSnapshotModal, setShowSnapshotModal] = useState(false);
-  const [showWorkingCopyModal, setShowWorkingCopyModal] = useState(false);
-  const [mergeVersion, setMergeVersion] = useState(null);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    loadVersions();
-  }, [treeId]);
+  const [showSnapshotModal, setShowSnapshotModal] = useState(false);
+  const [showWCModal, setShowWCModal] = useState(false);
+  const [previewVersion, setPreviewVersion] = useState(null);
+  const [detailVersion, setDetailVersion] = useState(null);
+  const [mergeVersion, setMergeVersion] = useState(null);
+
+  useEffect(() => { loadVersions(); }, [treeId]);
 
   async function loadVersions() {
     try {
@@ -35,8 +32,8 @@ export default function VersionsPanel({ treeId, onClose, onRefresh }) {
     }
   }
 
-  async function handleDelete(id) {
-    if (!confirm('Удалить эту версию?')) return;
+  async function handleDeleteSnapshot(id) {
+    if (!confirm('Удалить этот снапшот?')) return;
     try {
       await deleteVersion(treeId, id);
       await loadVersions();
@@ -46,120 +43,190 @@ export default function VersionsPanel({ treeId, onClose, onRefresh }) {
     }
   }
 
-  async function handleDiscard(id) {
-    if (!confirm('Отменить рабочую копию? Все изменения будут потеряны.')) return;
-    try {
-      await discardWorkingCopy(treeId, id);
-      await loadVersions();
-      onRefresh?.();
-    } catch (e) {
-      alert(e.message);
-    }
-  }
-
-  function formatDate(dateStr) {
+  function fmt(dateStr) {
     if (!dateStr) return '';
     return new Date(dateStr).toLocaleString('ru-RU', {
-      day: '2-digit', month: '2-digit', year: 'numeric',
+      day: '2-digit', month: 'short', year: 'numeric',
       hour: '2-digit', minute: '2-digit',
     });
   }
 
+  function refresh() { loadVersions(); onRefresh?.(); }
+
+  const snapshots    = versions.filter(v => v.type === 'SNAPSHOT');
+  const workingCopies = versions.filter(v => v.type === 'WORKING_COPY');
+  const activeWC     = workingCopies.filter(v => v.state === 'ACTIVE').length;
+
   return (
     <>
       <div className="versions-panel">
+
+        {/* ── Panel header ─────────────────────────────── */}
         <div className="versions-panel__header">
-          <h3>Версии</h3>
-          <button className="versions-panel__close" onClick={onClose}>
-            <X size={20} />
-          </button>
+          <h3>Версии дерева</h3>
+          <button className="versions-panel__close" onClick={onClose}><X size={20} /></button>
         </div>
 
-        <div className="versions-panel__actions">
-          <button className="btn btn--sm" onClick={() => setShowSnapshotModal(true)}>
-            <Plus size={14} /> Снапшот
-          </button>
-          <button className="btn btn--sm btn--outline" onClick={() => setShowWorkingCopyModal(true)}>
-            <GitBranch size={14} /> Копия
-          </button>
-        </div>
+        {loading && <div className="vp-loading">Загрузка...</div>}
+        {error   && <div className="error-text" style={{ padding: '10px 20px' }}>{error}</div>}
 
-        {loading && <div className="spinner">Загрузка...</div>}
-        {error && <div className="error-text">{error}</div>}
+        {!loading && (
+          <div className="vp-body">
 
-        {!loading && versions.length === 0 && (
-          <div className="versions-panel__empty">
-            Нет сохранённых версий. Создайте снапшот или рабочую копию.
+            {/* ── Snapshots ──────────────────────────────── */}
+            <section className="vp-section">
+              <div className="vp-section-head">
+                <div className="vp-section-title">
+                  <Camera size={14} color="#8b5cf6" />
+                  Снапшоты
+                  {snapshots.length > 0 && (
+                    <span className="vp-count">{snapshots.length}</span>
+                  )}
+                </div>
+                <button
+                  className="vp-add-btn"
+                  title="Создать снапшот"
+                  onClick={() => setShowSnapshotModal(true)}
+                >
+                  <Plus size={13} /> Создать
+                </button>
+              </div>
+
+              {snapshots.length === 0 ? (
+                <p className="vp-empty">
+                  Снапшот сохраняет состояние дерева на конкретный момент.
+                </p>
+              ) : (
+                <ul className="vp-list">
+                  {snapshots.map(v => (
+                    <li key={v.id} className="vp-item">
+                      <div className="vp-item-dot" style={{ background: '#8b5cf6' }} />
+                      <div className="vp-item-body">
+                        <div className="vp-item-name">{v.name}</div>
+                        <div className="vp-item-meta">
+                          {fmt(v.createdAt)}
+                          {v.entityCount > 0 && <> · {v.entityCount} объектов</>}
+                        </div>
+                      </div>
+                      <div className="vp-item-actions">
+                        <button
+                          className="icon-btn"
+                          title="Просмотр снапшота"
+                          onClick={() => setPreviewVersion(v)}
+                        >
+                          <Eye size={15} />
+                        </button>
+                        <button
+                          className="icon-btn icon-btn--danger"
+                          title="Удалить"
+                          onClick={() => handleDeleteSnapshot(v.id)}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            {/* ── Working copies ─────────────────────────── */}
+            <section className="vp-section">
+              <div className="vp-section-head">
+                <div className="vp-section-title">
+                  <GitBranch size={14} color="#3b82f6" />
+                  Рабочие копии
+                  {activeWC > 0 && <span className="vp-count vp-count--blue">{activeWC}</span>}
+                </div>
+                <button
+                  className="vp-add-btn"
+                  title="Создать рабочую копию"
+                  onClick={() => setShowWCModal(true)}
+                >
+                  <Plus size={13} /> Создать
+                </button>
+              </div>
+
+              {workingCopies.length === 0 ? (
+                <p className="vp-empty">
+                  Рабочая копия позволяет вносить изменения без затрагивания основного дерева.
+                </p>
+              ) : (
+                <ul className="vp-list">
+                  {workingCopies.map(v => (
+                    <li
+                      key={v.id}
+                      className={`vp-item ${v.state === 'MERGED' ? 'vp-item--merged' : ''}`}
+                    >
+                      <div
+                        className="vp-item-dot"
+                        style={{ background: v.state === 'MERGED' ? '#94a3b8' : '#3b82f6' }}
+                      />
+                      <div className="vp-item-body">
+                        <div className="vp-item-name">
+                          {v.name}
+                          {v.state === 'MERGED' && (
+                            <span className="vp-badge vp-badge--merged">слита</span>
+                          )}
+                        </div>
+                        <div className="vp-item-meta">
+                          {fmt(v.createdAt)}
+                          {v.createdBy && <> · {v.createdBy}</>}
+                        </div>
+                      </div>
+                      <div className="vp-item-actions">
+                        {v.state === 'ACTIVE' && (
+                          <button
+                            className="icon-btn"
+                            title="Детали и слияние"
+                            onClick={() => setDetailVersion(v)}
+                          >
+                            <GitMerge size={15} />
+                          </button>
+                        )}
+                        {v.state === 'MERGED' && (
+                          <CheckCircle2 size={15} color="#16a34a" style={{ margin: '0 4px' }} />
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
           </div>
         )}
-
-        <ul className="versions-list">
-          {versions.map(v => {
-            const typeInfo = TYPE_ICONS[v.type] || TYPE_ICONS.MAIN;
-            const Icon = typeInfo.icon;
-            return (
-              <li key={v.id} className={`versions-list__item versions-list__item--${v.type.toLowerCase()}`}>
-                <div className="versions-list__icon" style={{ color: typeInfo.color }}>
-                  <Icon size={18} />
-                </div>
-                <div className="versions-list__info">
-                  <div className="versions-list__name">
-                    {v.name}
-                    {v.state === 'MERGED' && <span className="badge badge--merged">merged</span>}
-                  </div>
-                  <div className="versions-list__meta">
-                    {typeInfo.label} &middot; {formatDate(v.createdAt)}
-                    {v.createdBy && <> &middot; {v.createdBy}</>}
-                    {v.entityCount > 0 && <> &middot; {v.entityCount} сущностей</>}
-                  </div>
-                </div>
-                <div className="versions-list__actions">
-                  {v.type === 'WORKING_COPY' && v.state === 'ACTIVE' && (
-                    <>
-                      <button
-                        className="icon-btn"
-                        title="Merge"
-                        onClick={() => setMergeVersion(v)}
-                      >
-                        <GitMerge size={16} />
-                      </button>
-                      <button
-                        className="icon-btn icon-btn--danger"
-                        title="Отменить"
-                        onClick={() => handleDiscard(v.id)}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </>
-                  )}
-                  {v.type === 'SNAPSHOT' && (
-                    <button
-                      className="icon-btn icon-btn--danger"
-                      title="Удалить"
-                      onClick={() => handleDelete(v.id)}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
       </div>
 
       {showSnapshotModal && (
         <CreateSnapshotModal
           treeId={treeId}
           onClose={() => setShowSnapshotModal(false)}
-          onCreated={() => { loadVersions(); onRefresh?.(); }}
+          onCreated={refresh}
         />
       )}
-      {showWorkingCopyModal && (
+      {showWCModal && (
         <CreateWorkingCopyModal
           treeId={treeId}
-          onClose={() => setShowWorkingCopyModal(false)}
-          onCreated={() => { loadVersions(); onRefresh?.(); }}
+          onClose={() => setShowWCModal(false)}
+          onCreated={refresh}
+        />
+      )}
+      {previewVersion && (
+        <SnapshotPreviewModal
+          treeId={treeId}
+          version={previewVersion}
+          onClose={() => setPreviewVersion(null)}
+          onRestored={refresh}
+        />
+      )}
+      {detailVersion && (
+        <WorkingCopyDetailModal
+          treeId={treeId}
+          version={detailVersion}
+          onClose={() => setDetailVersion(null)}
+          onMerge={v => { setDetailVersion(null); setMergeVersion(v); }}
+          onDiscarded={refresh}
         />
       )}
       {mergeVersion && (
@@ -167,7 +234,7 @@ export default function VersionsPanel({ treeId, onClose, onRefresh }) {
           treeId={treeId}
           version={mergeVersion}
           onClose={() => setMergeVersion(null)}
-          onMerged={() => { loadVersions(); onRefresh?.(); }}
+          onMerged={refresh}
         />
       )}
     </>

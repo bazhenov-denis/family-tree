@@ -11,5 +11,7 @@ public interface RelationshipRepository
 
   List<Relationship> findAllByTreeId(UUID treeId);
 
+  void deleteAllByTreeId(UUID treeId);
+
   void deleteAllByFromPersonOrToPerson(Person fromPerson, Person toPerson);
 }

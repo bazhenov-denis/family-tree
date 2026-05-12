@@ -79,6 +79,11 @@ export default function StatsModal({ graph, onClose }) {
           value={s.generations}
         />
         <StatCard
+          icon={Heart}
+          label="Браков"
+          value={s.relCounts.SPOUSE ?? 0}
+        />
+        <StatCard
           icon={Clock}
           label="Средняя продолжит. жизни"
           value={s.avgLifespan ? `${s.avgLifespan} лет` : null}

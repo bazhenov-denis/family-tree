@@ -35,6 +35,10 @@ public class LoginUserService {
       throw new IllegalArgumentException("Invalid credentials");
     }
 
+    if (!user.isEmailVerified()) {
+      throw new IllegalStateException("Подтвердите email перед входом");
+    }
+
     String token = tokenProvider.generateToken(user);
     return new AuthResponse(token);
   }

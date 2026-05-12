@@ -28,7 +28,7 @@ public class AcceptInviteByTokenService {
       throw new IllegalStateException("Token expired");
     }
 
-    acceptInviteService.accept(inviteToken.getInvite().getId());
+    acceptInviteService.accept(inviteToken.getInvite().getId(), user);
 
     inviteToken.markUsed();
   }

@@ -31,9 +31,11 @@ public class AcceptTreeInviteService {
 
   @Transactional
   public void accept(UUID inviteId) {
+    accept(inviteId, currentUserProvider.get());
+  }
 
-    User currentUser = currentUserProvider.get();
-
+  @Transactional
+  public void accept(UUID inviteId, User currentUser) {
     TreeInvite invite = inviteRepository
         .findByIdAndStatus(inviteId, InviteStatus.PENDING)
         .orElseThrow(() -> new com.example.backend.shared.exception.NotFoundException("Invite not found"));

@@ -14,6 +14,8 @@ public interface MediaRepository extends JpaRepository<Media, UUID> {
 
   List<Media> findAllByTreeIdOrderByCreatedAtAsc(UUID treeId);
 
+  void deleteAllByTreeId(UUID treeId);
+
   @Query("SELECT m.tree.id, COUNT(m) FROM Media m WHERE m.tree.id IN :treeIds GROUP BY m.tree.id")
   List<Object[]> countMediaByTreeIds(List<UUID> treeIds);
 }

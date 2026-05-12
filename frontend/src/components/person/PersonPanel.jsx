@@ -362,33 +362,35 @@ export default function PersonPanel({ treeId, node, graph, canEdit, onClose, onR
                   <ul className="event-list">
                     {events.map(ev => (
                       <li key={ev.id} className="event-item">
-                        <span className="event-icon">{EVENT_ICONS[ev.type] || '📌'}</span>
-                        <div className="event-info">
-                          <span className="event-type">{EVENT_LABELS[ev.type] || ev.type}</span>
-                          {ev.title && <span className="event-title">{ev.title}</span>}
-                          {(ev.dateFrom || ev.dateTo) && (
-                            <span className="event-date">
-                              {ev.dateFrom && formatDate(ev.dateFrom)}
-                              {ev.dateTo && ev.dateFrom && ' — '}
-                              {ev.dateTo && formatDate(ev.dateTo)}
-                            </span>
+                        <div className="event-main">
+                          <span className="event-icon">{EVENT_ICONS[ev.type] || '📌'}</span>
+                          <div className="event-info">
+                            <span className="event-type">{EVENT_LABELS[ev.type] || ev.type}</span>
+                            {ev.title && <span className="event-title">{ev.title}</span>}
+                            {(ev.dateFrom || ev.dateTo) && (
+                              <span className="event-date">
+                                {ev.dateFrom && formatDate(ev.dateFrom)}
+                                {ev.dateTo && ev.dateFrom && ' — '}
+                                {ev.dateTo && formatDate(ev.dateTo)}
+                              </span>
+                            )}
+                          </div>
+                          {canEdit && (
+                            <div className="event-actions">
+                              <button className="icon-btn" title="Редактировать" onClick={() => setEditingEvent(ev)}>
+                                <Edit2 size={13} />
+                              </button>
+                              <button
+                                className="icon-btn danger"
+                                title="Удалить"
+                                disabled={deletingEvent === ev.id}
+                                onClick={() => handleDeleteEvent(ev.id)}
+                              >
+                                {deletingEvent === ev.id ? <Spinner size={13} /> : <Trash2 size={13} />}
+                              </button>
+                            </div>
                           )}
                         </div>
-                        {canEdit && (
-                          <div className="event-actions">
-                            <button className="icon-btn" title="Редактировать" onClick={() => setEditingEvent(ev)}>
-                              <Edit2 size={13} />
-                            </button>
-                            <button
-                              className="icon-btn danger"
-                              title="Удалить"
-                              disabled={deletingEvent === ev.id}
-                              onClick={() => handleDeleteEvent(ev.id)}
-                            >
-                              {deletingEvent === ev.id ? <Spinner size={13} /> : <Trash2 size={13} />}
-                            </button>
-                          </div>
-                        )}
                         <EventMediaInline treeId={treeId} eventId={ev.id} canEdit={canEdit} />
                       </li>
                     ))}

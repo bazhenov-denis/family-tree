@@ -1,6 +1,7 @@
 package com.example.backend.version.api;
 
 import com.example.backend.version.application.MergeService;
+import com.example.backend.version.application.RestoreSnapshotService;
 import com.example.backend.version.application.SnapshotService;
 import com.example.backend.version.application.VersionService;
 import com.example.backend.version.application.WorkingCopyService;
@@ -8,7 +9,9 @@ import com.example.backend.version.dto.CreateSnapshotRequest;
 import com.example.backend.version.dto.CreateWorkingCopyRequest;
 import com.example.backend.version.dto.MergeConflict;
 import com.example.backend.version.dto.ResolveConflictRequest;
+import com.example.backend.version.dto.SnapshotPreviewResponse;
 import com.example.backend.version.dto.VersionResponse;
+import com.example.backend.version.dto.WorkingCopyContextResponse;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -29,17 +32,20 @@ public class VersionController {
   private final SnapshotService snapshotService;
   private final WorkingCopyService workingCopyService;
   private final MergeService mergeService;
+  private final RestoreSnapshotService restoreSnapshotService;
 
   public VersionController(
       VersionService versionService,
       SnapshotService snapshotService,
       WorkingCopyService workingCopyService,
-      MergeService mergeService
+      MergeService mergeService,
+      RestoreSnapshotService restoreSnapshotService
   ) {
     this.versionService = versionService;
     this.snapshotService = snapshotService;
     this.workingCopyService = workingCopyService;
     this.mergeService = mergeService;
+    this.restoreSnapshotService = restoreSnapshotService;
   }
 
   // ─── List / Get / Delete ───────────────────────────────────────────────────
@@ -52,6 +58,16 @@ public class VersionController {
   @GetMapping("/{versionId}")
   public VersionResponse getVersion(@PathVariable UUID treeId, @PathVariable UUID versionId) {
     return versionService.getVersion(treeId, versionId);
+  }
+
+  @GetMapping("/{versionId}/preview")
+  public SnapshotPreviewResponse getVersionPreview(@PathVariable UUID treeId, @PathVariable UUID versionId) {
+    return versionService.getVersionPreview(treeId, versionId);
+  }
+
+  @GetMapping("/context")
+  public WorkingCopyContextResponse getWorkingCopyContext(@PathVariable UUID treeId) {
+    return versionService.getWorkingCopyContext(treeId);
   }
 
   @DeleteMapping("/{versionId}")
@@ -67,6 +83,11 @@ public class VersionController {
   public VersionResponse createSnapshot(@PathVariable UUID treeId,
                                         @RequestBody CreateSnapshotRequest req) {
     return snapshotService.createSnapshot(treeId, req);
+  }
+
+  @PostMapping("/{versionId}/restore")
+  public VersionResponse restoreSnapshot(@PathVariable UUID treeId, @PathVariable UUID versionId) {
+    return restoreSnapshotService.restoreSnapshot(treeId, versionId);
   }
 
   // ─── Working Copies ────────────────────────────────────────────────────────

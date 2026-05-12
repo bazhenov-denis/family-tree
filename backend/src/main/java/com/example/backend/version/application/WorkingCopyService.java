@@ -153,8 +153,8 @@ public class WorkingCopyService {
         data.put("firstName", p.getFirstName());
         data.put("lastName", p.getLastName());
         data.put("gender", p.getGender());
-        data.put("birthDate", p.getBirthDate());
-        data.put("deathDate", p.getDeathDate());
+        data.put("birthDate", dateString(p.getBirthDate()));
+        data.put("deathDate", dateString(p.getDeathDate()));
         data.put("birthPlace", p.getBirthPlace());
         data.put("deathPlace", p.getDeathPlace());
         data.put("bio", p.getBio());
@@ -175,15 +175,19 @@ public class WorkingCopyService {
           .orElseThrow(() -> new NotFoundException("Cloned person not found"));
       Person to = personRepository.findById(personIdMap.get(r.getToPerson().getId()))
           .orElseThrow(() -> new NotFoundException("Cloned person not found"));
-      relationshipRepository.save(new Relationship(clonedTree, from, to, r.getType()));
+      Relationship clone = new Relationship(clonedTree, from, to, r.getType());
+      relationshipRepository.save(clone);
 
       try {
-        String json = objectMapper.writeValueAsString(Map.of(
-            "id", r.getId(),
-            "fromPersonId", r.getFromPerson().getId(),
-            "toPersonId", r.getToPerson().getId(),
-            "type", r.getType().name()
-        ));
+        Map<String, Object> data = new HashMap<>();
+        data.put("id", r.getId());
+        data.put("clonedId", clone.getId());
+        data.put("fromPersonId", r.getFromPerson().getId());
+        data.put("toPersonId", r.getToPerson().getId());
+        data.put("clonedFromPersonId", from.getId());
+        data.put("clonedToPersonId", to.getId());
+        data.put("type", r.getType().name());
+        String json = objectMapper.writeValueAsString(data);
         versionEntityRepository.save(VersionEntity.create(wc, "RELATIONSHIP", r.getId(), json));
       } catch (Exception e) {
         throw new RuntimeException("Failed to serialize relationship " + r.getId(), e);
@@ -215,8 +219,8 @@ public class WorkingCopyService {
         data.put("clonedId", clone.getId());
         data.put("type", e.getType());
         data.put("title", e.getTitle());
-        data.put("dateFrom", e.getDateFrom());
-        data.put("dateTo", e.getDateTo());
+        data.put("dateFrom", dateString(e.getDateFrom()));
+        data.put("dateTo", dateString(e.getDateTo()));
         data.put("personIds", personIds);
         String json = objectMapper.writeValueAsString(data);
         versionEntityRepository.save(VersionEntity.create(wc, "EVENT", e.getId(), json));
@@ -251,8 +255,11 @@ public class WorkingCopyService {
       try {
         Map<String, Object> data = new HashMap<>();
         data.put("id", m.getId());
+        data.put("clonedId", clone.getId());
         data.put("personId", m.getPerson() != null ? m.getPerson().getId() : null);
         data.put("eventId", m.getEvent() != null ? m.getEvent().getId() : null);
+        data.put("clonedPersonId", clonedPerson != null ? clonedPerson.getId() : null);
+        data.put("clonedEventId", clonedEvent != null ? clonedEvent.getId() : null);
         data.put("url", m.getUrl());
         data.put("description", m.getDescription());
         data.put("mimeType", m.getMimeType());
@@ -294,9 +301,15 @@ public class WorkingCopyService {
 
   private VersionResponse toResponse(Version v) {
     int count = versionEntityRepository.findAllByVersionId(v.getId()).size();
-    return new VersionResponse(
+    VersionResponse resp = new VersionResponse(
         v.getId(), v.getName(), v.getDescription(), v.getType().name(),
         v.getState().name(), v.getParentId(), v.getBaseSnapshotId(),
         v.getCreatedAt(), v.getCreatedBy() != null ? v.getCreatedBy().getEmail() : null, count);
+    resp.setClonedTreeId(v.getClonedTreeId());
+    return resp;
+  }
+
+  private static String dateString(java.time.LocalDate date) {
+    return date != null ? date.toString() : null;
   }
 }

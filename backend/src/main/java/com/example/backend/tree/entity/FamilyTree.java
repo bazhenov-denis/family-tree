@@ -18,6 +18,8 @@ import org.hibernate.type.SqlTypes;
 public class FamilyTree extends BaseEntity {
 
   private String title;
+
+  @Column(columnDefinition = "text")
   private String description;
 
   @ManyToOne

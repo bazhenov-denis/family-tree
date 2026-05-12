@@ -6,6 +6,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "version_entity")
@@ -20,6 +22,7 @@ public class VersionEntity extends BaseEntity {
 
   private String operation; // CREATE, UPDATE, DELETE
 
+  @JdbcTypeCode(SqlTypes.JSON)
   @Column(columnDefinition = "jsonb")
   private String entityData;
 

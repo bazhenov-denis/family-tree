@@ -7,6 +7,12 @@ import Spinner from '../components/ui/Spinner.jsx';
 
 const ROLE_LABELS = { EDITOR: 'Редактор', VIEWER: 'Читатель' };
 
+function withInviteParams(path, token, email) {
+  const params = new URLSearchParams({ redirect: `/invite/${token}` });
+  if (email) params.set('email', email);
+  return `${path}?${params.toString()}`;
+}
+
 export default function InviteTokenPage() {
   const { token } = useParams();
   const { isAuthenticated } = useAuth();
@@ -27,7 +33,7 @@ export default function InviteTokenPage() {
 
   async function handleAccept() {
     if (!isAuthenticated) {
-      navigate(`/login?redirect=/invite/${token}`);
+      navigate(withInviteParams('/login', token, preview?.email));
       return;
     }
     setAccepting(true);
@@ -89,10 +95,10 @@ export default function InviteTokenPage() {
                 ) : (
                   <>
                     <p className="text-muted">Войдите, чтобы принять приглашение</p>
-                    <Link to={`/login?redirect=/invite/${token}`} className="btn btn-primary btn-full">
+                    <Link to={withInviteParams('/login', token, preview.email)} className="btn btn-primary btn-full">
                       <LogIn size={16} /> Войти
                     </Link>
-                    <Link to={`/register?redirect=/invite/${token}`} className="btn btn-ghost btn-full">
+                    <Link to={withInviteParams('/register', token, preview.email)} className="btn btn-ghost btn-full">
                       Создать аккаунт
                     </Link>
                   </>

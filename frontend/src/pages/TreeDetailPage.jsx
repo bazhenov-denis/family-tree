@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   Users, ArrowLeft, RefreshCw, UserPlus, MoreHorizontal,
   GitFork, BarChart2, Download, Upload, ScrollText,
@@ -20,8 +20,11 @@ import GedcomImportModal from '../components/tree/GedcomImportModal.jsx';
 import StatsModal from '../components/tree/StatsModal.jsx';
 import AuditLogModal from '../components/tree/AuditLogModal.jsx';
 import VersionsPanel from '../components/version/VersionsPanel.jsx';
+import MergeWizard from '../components/version/MergeWizard.jsx';
 import { getTree } from '../api/trees.js';
 import { getTreeGraph } from '../api/graph.js';
+import { getWorkingCopyContext, listVersions } from '../api/versions.js';
+import { GitBranch, ArrowRight, GitMerge, ChevronDown, ExternalLink } from 'lucide-react';
 
 // ── Overflow "more" menu ────────────────────────────────────────
 function MoreMenu({ items }) {
@@ -72,6 +75,86 @@ function MoreMenu({ items }) {
   );
 }
 
+function VersionSwitcher({ treeId, wcContext, onOpenVersions }) {
+  const [open, setOpen] = useState(false);
+  const [versions, setVersions] = useState([]);
+  const ref = useRef(null);
+  const navigate = useNavigate();
+  const activeCopies = versions.filter(v => v.type === 'WORKING_COPY' && v.state === 'ACTIVE');
+
+  useEffect(() => {
+    if (!open || wcContext) return;
+    listVersions(treeId).then(data => setVersions(data || [])).catch(() => setVersions([]));
+  }, [open, treeId, wcContext]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    document.addEventListener('touchend', handler);
+    return () => {
+      document.removeEventListener('mousedown', handler);
+      document.removeEventListener('touchend', handler);
+    };
+  }, [open]);
+
+  return (
+    <div className="version-switcher" ref={ref}>
+      <button
+        className={`version-switcher-btn${wcContext ? ' version-switcher-btn--copy' : ''}`}
+        onClick={() => setOpen(v => !v)}
+        title="Текущая версия дерева"
+      >
+        <GitBranch size={14} />
+        <span>{wcContext ? wcContext.versionName : 'main'}</span>
+        <ChevronDown size={13} />
+      </button>
+      {open && (
+        <div className="version-switcher-menu">
+          <div className="version-switcher-current">
+            <div className="version-switcher-label">Сейчас открыто</div>
+            <div className="version-switcher-name">{wcContext ? wcContext.versionName : 'main'}</div>
+          </div>
+          {wcContext ? (
+            <button
+              className="version-switcher-item"
+              onClick={() => { setOpen(false); navigate(`/trees/${wcContext.mainTreeId}`); }}
+            >
+              <GitBranch size={14} />
+              Перейти в main
+            </button>
+          ) : (
+            <>
+              {activeCopies.length > 0 ? activeCopies.map(copy => (
+                <button
+                  key={copy.id}
+                  className="version-switcher-item"
+                  onClick={() => { setOpen(false); navigate(`/trees/${copy.clonedTreeId}`); }}
+                >
+                  <ExternalLink size={14} />
+                  {copy.name}
+                </button>
+              )) : (
+                <div className="version-switcher-empty">Активных рабочих копий нет</div>
+              )}
+            </>
+          )}
+          <div className="more-menu-sep" />
+          <button
+            className="version-switcher-item"
+            onClick={() => { setOpen(false); onOpenVersions(); }}
+          >
+            <GitMerge size={14} />
+            Управление версиями
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Page ────────────────────────────────────────────────────────
 export default function TreeDetailPage() {
   const { treeId } = useParams();
@@ -94,6 +177,9 @@ export default function TreeDetailPage() {
   const [showVersions, setShowVersions] = useState(false);
   const [flyToTarget, setFlyToTarget] = useState(null);
   const [viewMode, setViewMode] = useState('graph');
+  const [wcContext, setWcContext] = useState(null);
+  const [wcMergeVersion, setWcMergeVersion] = useState(null);
+  const navigate = useNavigate();
 
   const canEdit = tree?.role === 'OWNER' || tree?.role === 'EDITOR';
   const isOwner = tree?.role === 'OWNER';
@@ -153,10 +239,47 @@ export default function TreeDetailPage() {
     }
   }
 
+  function loadWorkingCopyContext() {
+    return getWorkingCopyContext(treeId)
+      .then(ctx => {
+        if (ctx && ctx.versionState && ctx.versionState !== 'ACTIVE') {
+          navigate(`/trees/${ctx.mainTreeId}`, { replace: true });
+          return ctx;
+        }
+        setWcContext(ctx || null);
+        return ctx || null;
+      })
+      .catch(() => {
+        setWcContext(null);
+        return null;
+      });
+  }
+
   useEffect(() => {
-    loadTree();
-    loadGraph();
+    let cancelled = false;
+    setError('');
+    setTreeLoading(true);
+    setGraphLoading(true);
+    loadWorkingCopyContext().then(ctx => {
+      if (cancelled || (ctx && ctx.versionState && ctx.versionState !== 'ACTIVE')) return;
+      loadTree();
+      loadGraph();
+    });
+    return () => { cancelled = true; };
   }, [treeId]);
+
+  async function refreshAfterVersionAction() {
+    if (!wcContext) {
+      loadGraph();
+      return;
+    }
+    const ctx = await loadWorkingCopyContext();
+    if (!ctx || ctx.versionState !== 'ACTIVE') {
+      navigate(`/trees/${wcContext.mainTreeId}`, { replace: true });
+      return;
+    }
+    loadGraph();
+  }
 
   const moreItems = [
     {
@@ -250,6 +373,19 @@ export default function TreeDetailPage() {
                 }}
               />
             )}
+            <VersionSwitcher
+              treeId={wcContext?.mainTreeId || treeId}
+              wcContext={wcContext}
+              onOpenVersions={() => setShowVersions(true)}
+            />
+            <button
+              className="icon-btn"
+              onClick={() => setShowVersions(true)}
+              title="Управление версиями"
+              aria-label="Управление версиями"
+            >
+              <GitFork size={15} />
+            </button>
             {hasNodes && (
               <div className="view-toggle view-toggle--segmented">
                 <button
@@ -294,6 +430,37 @@ export default function TreeDetailPage() {
         </div>
 
         {error && <div className="error-banner" style={{ marginBottom: 10 }}>{error}</div>}
+
+        {/* ── Working-copy banner ── */}
+        {wcContext && (
+          <div className="wc-banner">
+            <div className="wc-banner-left">
+              <GitBranch size={14} />
+              <span>Рабочая копия&nbsp;<strong>{wcContext.versionName}</strong></span>
+              <ArrowRight size={12} style={{ opacity: .5 }} />
+              <span style={{ opacity: .7 }}>Основное дерево</span>
+            </div>
+            <div className="wc-banner-right">
+              <button
+                className="wc-banner-btn"
+                onClick={() => navigate(`/trees/${wcContext.mainTreeId}`)}
+              >
+                ← Перейти к основному
+              </button>
+              <button
+                className="wc-banner-btn wc-banner-btn--merge"
+                onClick={() => setWcMergeVersion({
+                  id: wcContext.versionId,
+                  name: wcContext.versionName,
+                  description: wcContext.versionDescription,
+                  clonedTreeId: treeId,
+                })}
+              >
+                <GitMerge size={12} /> Слить в основное
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ── Graph — fills remaining height ── */}
         <div className="graph-wrapper" style={{ position: 'relative' }}>
@@ -375,9 +542,21 @@ export default function TreeDetailPage() {
       )}
       {showVersions && (
         <VersionsPanel
-          treeId={treeId}
+          treeId={wcContext?.mainTreeId || treeId}
           onClose={() => setShowVersions(false)}
-          onRefresh={loadGraph}
+          onRefresh={refreshAfterVersionAction}
+        />
+      )}
+      {wcMergeVersion && (
+        <MergeWizard
+          treeId={wcContext.mainTreeId}
+          version={wcMergeVersion}
+          onClose={() => setWcMergeVersion(null)}
+          onMerged={() => {
+            setWcMergeVersion(null);
+            setWcContext(null);
+            navigate(`/trees/${wcContext.mainTreeId}`, { replace: true });
+          }}
         />
       )}
     </Layout>

@@ -63,6 +63,13 @@ public class RelationshipService {
   private static final Set<RelationshipType> GEN_TYPES =
       Set.of(RelationshipType.PARENT, RelationshipType.GUARDIAN, RelationshipType.ADOPTED);
 
+  public List<RelationshipResponse> list(UUID treeId) {
+    resolveMember(treeId);
+    return relationshipRepository.findAllByTreeId(treeId).stream()
+        .map(RelationshipResponse::new)
+        .toList();
+  }
+
   public RelationshipResponse create(UUID treeId, RelationshipRequest req) {
     TreeMember member = resolveMember(treeId);
     permissionService.checkCanEdit(member);

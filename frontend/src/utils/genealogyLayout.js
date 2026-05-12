@@ -55,29 +55,43 @@ export function computeLayout(nodes, edges) {
   });
   const gens = [...byGen.keys()].sort((a, b) => a - b);
 
-  // ── Build couple-groups within each generation ────────────────
-  // A group = { ids: [id] | [id, spouseId], width, x }
+  // ── Build spouse-groups within each generation ────────────────
+  // A group keeps every same-generation spouse component together. This is
+  // important for people with several spouse links: otherwise the extra spouse
+  // can drift far away and create a very long horizontal relationship line.
+  // A group = { ids: [id] | [spouse, id, spouse...], width, x }
   const groupOf  = new Map();
   const genGroups = new Map();
 
   for (const g of gens) {
     const persons = byGen.get(g);
+    const personSet = new Set(persons);
     const seen    = new Set();
     const groups  = [];
 
     for (const id of persons) {
       if (seen.has(id)) continue;
+      const component = [];
+      const stack = [id];
       seen.add(id);
 
-      const spouseHere = spousesOf.get(id)?.find(
-        sid => gen.get(sid) === g && !seen.has(sid) && persons.includes(sid)
-      );
+      while (stack.length) {
+        const curr = stack.pop();
+        component.push(curr);
+        for (const sid of spousesOf.get(curr) ?? []) {
+          if (gen.get(sid) !== g || !personSet.has(sid) || seen.has(sid)) continue;
+          seen.add(sid);
+          stack.push(sid);
+        }
+      }
 
-      const grp = spouseHere
-        ? { ids: [id, spouseHere], width: CARD_W * 2 + COUPLE_GAP, x: 0 }
-        : { ids: [id],             width: CARD_W,                   x: 0 };
+      const ids = orderSpouseComponent(component, spousesOf);
+      const grp = {
+        ids,
+        width: CARD_W * ids.length + COUPLE_GAP * Math.max(0, ids.length - 1),
+        x: 0,
+      };
 
-      if (spouseHere) seen.add(spouseHere);
       groups.push(grp);
       grp.ids.forEach(gid => groupOf.set(gid, grp));
     }
@@ -202,4 +216,26 @@ function resolveOverlaps(groups) {
       for (let j = i; j < sorted.length; j++) sorted[j].x += delta;
     }
   }
+}
+
+function orderSpouseComponent(ids, spousesOf) {
+  if (ids.length <= 2) return ids;
+
+  const idSet = new Set(ids);
+  const center = [...ids].sort((a, b) => {
+    const degreeA = (spousesOf.get(a) ?? []).filter(id => idSet.has(id)).length;
+    const degreeB = (spousesOf.get(b) ?? []).filter(id => idSet.has(id)).length;
+    return degreeB - degreeA;
+  })[0];
+
+  const spouses = ids.filter(id => id !== center);
+  const left = [];
+  const right = [];
+
+  spouses.forEach((id, idx) => {
+    if (idx % 2 === 0) left.unshift(id);
+    else right.push(id);
+  });
+
+  return [...left, center, ...right];
 }

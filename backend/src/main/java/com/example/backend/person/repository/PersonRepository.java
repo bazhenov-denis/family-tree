@@ -12,6 +12,8 @@ public interface PersonRepository
 
   List<Person> findAllByTreeId(UUID treeId);
 
+  void deleteAllByTreeId(UUID treeId);
+
   @Query("SELECT p.tree.id, COUNT(p) FROM Person p WHERE p.tree.id IN :treeIds GROUP BY p.tree.id")
   List<Object[]> countPersonsByTreeIds(List<UUID> treeIds);
 }

@@ -1,6 +1,7 @@
 package com.example.backend.auth.application;
 
 import com.example.backend.auth.dto.RegisterUserRequest;
+import com.example.backend.auth.dto.RegisterResponse;
 import com.example.backend.auth.entity.User;
 import com.example.backend.auth.repository.UserRepository;
 import jakarta.transaction.Transactional;
@@ -12,22 +13,25 @@ public class RegisterUserService {
 
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
+  private final SendEmailVerificationService sendEmailVerificationService;
 
   public RegisterUserService(
       UserRepository userRepository,
-      PasswordEncoder passwordEncoder
+      PasswordEncoder passwordEncoder,
+      SendEmailVerificationService sendEmailVerificationService
   ) {
     this.userRepository = userRepository;
     this.passwordEncoder = passwordEncoder;
+    this.sendEmailVerificationService = sendEmailVerificationService;
   }
 
   @Transactional
-  public User register(RegisterUserRequest request) {
+  public RegisterResponse register(RegisterUserRequest request) {
 
-    String email = request.getEmail().toLowerCase();
+    String email = request.getEmail().trim().toLowerCase();
 
     if (userRepository.existsByEmail(email)) {
-      throw new IllegalArgumentException("Email already registered");
+      throw new IllegalArgumentException("Email уже зарегистрирован");
     }
 
     User user = new User();
@@ -35,6 +39,13 @@ public class RegisterUserService {
     user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
     user.setName(request.getName());
 
-    return userRepository.save(user);
+    User savedUser = userRepository.save(user);
+    sendEmailVerificationService.send(savedUser, request.getRedirectPath());
+
+    return new RegisterResponse(
+        savedUser.getEmail(),
+        savedUser.isEmailVerified(),
+        "Мы отправили письмо со ссылкой для подтверждения email"
+    );
   }
 }

@@ -13,6 +13,7 @@ import InvitesPage from './pages/InvitesPage.jsx';
 import InviteTokenPage from './pages/InviteTokenPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import LandingPage from './pages/LandingPage.jsx';
+import VerifyEmailPage from './pages/VerifyEmailPage.jsx';
 
 function HomeRedirect() {
   const { isAuthenticated } = useAuth();
@@ -27,6 +28,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/invite/:token" element={<InviteTokenPage />} />
 
           <Route path="/trees" element={<ProtectedRoute><TreesPage /></ProtectedRoute>} />

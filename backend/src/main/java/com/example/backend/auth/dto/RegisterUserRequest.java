@@ -15,6 +15,7 @@ public class RegisterUserRequest {
   private String password;
 
   private String name;
+  private String redirectPath;
 
   public String getEmail() {
     return email;
@@ -26,5 +27,9 @@ public class RegisterUserRequest {
 
   public String getName() {
     return name;
+  }
+
+  public String getRedirectPath() {
+    return redirectPath;
   }
 }

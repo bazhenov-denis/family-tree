@@ -1,7 +1,9 @@
 package com.example.backend.version.application;
 
+import com.example.backend.auth.entity.User;
 import com.example.backend.event.entity.Event;
-import com.example.backend.event.repository.EventRepository;
+import com.example.backend.event.entity.EventPerson;
+import com.example.backend.event.repository.EventPersonRepository;
 import com.example.backend.event.repository.EventRepository;
 import com.example.backend.media.entity.Media;
 import com.example.backend.media.repository.MediaRepository;
@@ -16,13 +18,13 @@ import com.example.backend.tree.entity.FamilyTree;
 import com.example.backend.tree.entity.TreeMember;
 import com.example.backend.tree.repository.FamilyTreeRepository;
 import com.example.backend.tree.repository.TreeMemberRepository;
-import com.example.backend.auth.entity.User;
 import com.example.backend.version.dto.MergeConflict;
 import com.example.backend.version.dto.ResolveConflictRequest;
 import com.example.backend.version.dto.VersionResponse;
 import com.example.backend.version.entity.Version;
 import com.example.backend.version.entity.VersionEntity;
 import com.example.backend.version.entity.VersionState;
+import com.example.backend.version.entity.VersionType;
 import com.example.backend.version.repository.VersionEntityRepository;
 import com.example.backend.version.repository.VersionRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -32,8 +34,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +50,7 @@ public class MergeService {
   private final PersonRepository personRepository;
   private final RelationshipRepository relationshipRepository;
   private final EventRepository eventRepository;
+  private final EventPersonRepository eventPersonRepository;
   private final MediaRepository mediaRepository;
   private final FamilyTreeRepository treeRepository;
   private final TreeMemberRepository memberRepository;
@@ -59,6 +64,7 @@ public class MergeService {
       PersonRepository personRepository,
       RelationshipRepository relationshipRepository,
       EventRepository eventRepository,
+      EventPersonRepository eventPersonRepository,
       MediaRepository mediaRepository,
       FamilyTreeRepository treeRepository,
       TreeMemberRepository memberRepository,
@@ -71,6 +77,7 @@ public class MergeService {
     this.personRepository = personRepository;
     this.relationshipRepository = relationshipRepository;
     this.eventRepository = eventRepository;
+    this.eventPersonRepository = eventPersonRepository;
     this.mediaRepository = mediaRepository;
     this.treeRepository = treeRepository;
     this.memberRepository = memberRepository;
@@ -79,517 +86,338 @@ public class MergeService {
     this.objectMapper = objectMapper;
   }
 
-  /**
-   * Three-way merge: compare base snapshot vs main tree (ours) vs working copy (theirs).
-   * Returns list of conflicts if any, otherwise auto-applies changes.
-   */
   @Transactional(readOnly = true)
   public List<MergeConflict> getConflicts(UUID treeId, UUID versionId) {
     Version wc = resolveWorkingCopy(treeId, versionId);
-    Version base = findBaseSnapshot(wc);
+    permissionService.checkCanView(resolveMember(treeId));
+
     FamilyTree mainTree = wc.getTree();
-    FamilyTree clonedTree = treeRepository.findById(wc.getClonedTreeId())
-        .orElseThrow(() -> new NotFoundException("Cloned tree not found"));
+    FamilyTree clonedTree = resolveClonedTree(wc);
+    VersionIndex index = VersionIndex.of(wc, versionEntityRepository, objectMapper);
 
     List<MergeConflict> conflicts = new ArrayList<>();
-    conflicts.addAll(comparePersons(base, mainTree, clonedTree));
-    conflicts.addAll(compareRelationships(base, mainTree, clonedTree));
-    conflicts.addAll(compareEvents(base, mainTree, clonedTree));
-    conflicts.addAll(compareMedia(base, mainTree, clonedTree));
+    conflicts.addAll(personConflicts(mainTree, clonedTree, index));
+    conflicts.addAll(eventConflicts(mainTree, clonedTree, index));
+    conflicts.addAll(mediaConflicts(mainTree, clonedTree, index));
+    conflicts.addAll(relationshipConflicts(mainTree, clonedTree, index));
     return conflicts;
   }
 
-  /**
-   * Resolve a single conflict by choosing OURS (main tree) or THEIRS (working copy).
-   */
   @Transactional
   public void resolveConflict(UUID treeId, UUID versionId, ResolveConflictRequest req) {
     Version wc = resolveWorkingCopy(treeId, versionId);
+    permissionService.checkCanManage(resolveMember(treeId));
+
+    if (!"THEIRS".equalsIgnoreCase(req.getResolution())) {
+      return;
+    }
+
     FamilyTree mainTree = wc.getTree();
-    FamilyTree clonedTree = treeRepository.findById(wc.getClonedTreeId())
-        .orElseThrow(() -> new NotFoundException("Cloned tree not found"));
+    FamilyTree clonedTree = resolveClonedTree(wc);
+    VersionIndex index = VersionIndex.of(wc, versionEntityRepository, objectMapper);
 
-    UUID entityId = req.getEntityId();
-    String entityType = req.getEntityType();
-    boolean ours = "OURS".equalsIgnoreCase(req.getResolution());
-
-    switch (entityType) {
-      case "PERSON" -> applyPersonResolution(mainTree, clonedTree, entityId, ours);
-      case "RELATIONSHIP" -> applyRelationshipResolution(mainTree, clonedTree, entityId, ours);
-      case "EVENT" -> applyEventResolution(mainTree, clonedTree, entityId, ours);
-      case "MEDIA" -> applyMediaResolution(mainTree, clonedTree, entityId, ours);
-      default -> throw new IllegalArgumentException("Unknown entity type: " + entityType);
+    switch (req.getEntityType()) {
+      case "PERSON" -> applyPersonFromCopy(mainTree, clonedTree, req.getEntityId(), index);
+      case "EVENT" -> applyEventFromCopy(mainTree, clonedTree, req.getEntityId(), index);
+      case "MEDIA" -> applyMediaFromCopy(mainTree, clonedTree, req.getEntityId(), index);
+      case "RELATIONSHIP" -> applyRelationshipFromCopy(mainTree, clonedTree, req.getEntityId(), index);
+      default -> throw new IllegalArgumentException("Unknown entity type: " + req.getEntityType());
     }
   }
 
-  /**
-   * Complete the merge: apply all non-conflicting changes and resolved conflicts,
-   * then mark working copy as MERGED and soft-delete the cloned tree.
-   */
   @Transactional
   public VersionResponse completeMerge(UUID treeId, UUID versionId) {
     Version wc = resolveWorkingCopy(treeId, versionId);
     permissionService.checkCanManage(resolveMember(treeId));
 
-    Version base = findBaseSnapshot(wc);
     FamilyTree mainTree = wc.getTree();
-    FamilyTree clonedTree = treeRepository.findById(wc.getClonedTreeId())
-        .orElseThrow(() -> new NotFoundException("Cloned tree not found"));
+    FamilyTree clonedTree = resolveClonedTree(wc);
+    VersionIndex index = VersionIndex.of(wc, versionEntityRepository, objectMapper);
 
-    // Apply auto-merge changes (no conflicts)
-    mergePersons(base, mainTree, clonedTree);
-    mergeRelationships(base, mainTree, clonedTree);
-    mergeEvents(base, mainTree, clonedTree);
-    mergeMedia(base, mainTree, clonedTree);
+    mergePersons(mainTree, clonedTree, index);
+    mergeEvents(mainTree, clonedTree, index);
+    mergeMedia(mainTree, clonedTree, index);
+    mergeRelationships(mainTree, clonedTree, index);
 
-    // Mark working copy as merged
     wc.setState(VersionState.MERGED);
-
-    // Soft-delete cloned tree
     clonedTree.delete();
-
     return toResponse(wc);
   }
 
-  // ─── Conflict detection ────────────────────────────────────────────────────
-
-  private List<MergeConflict> comparePersons(Version base, FamilyTree mainTree, FamilyTree clonedTree) {
+  private List<MergeConflict> personConflicts(FamilyTree mainTree, FamilyTree clonedTree, VersionIndex index) {
+    Map<UUID, Person> main = byId(personRepository.findAllByTreeId(mainTree.getId()));
+    Map<UUID, Person> copy = byId(personRepository.findAllByTreeId(clonedTree.getId()));
     List<MergeConflict> conflicts = new ArrayList<>();
-    Map<UUID, String> basePersons = base != null ? extractEntityIds(base, "PERSON") : Map.of();
-    List<Person> mainPersons = personRepository.findAllByTreeId(mainTree.getId());
-    List<Person> clonedPersons = personRepository.findAllByTreeId(clonedTree.getId());
 
-    Map<UUID, Person> mainMap = mainPersons.stream().collect(Collectors.toMap(Person::getId, p -> p));
-    Map<UUID, Person> clonedMap = clonedPersons.stream().collect(Collectors.toMap(Person::getId, p -> p));
+    for (Map.Entry<UUID, UUID> entry : index.originalToClone("PERSON").entrySet()) {
+      UUID originalId = entry.getKey();
+      Person ours = main.get(originalId);
+      Person theirs = copy.get(entry.getValue());
+      JsonNode base = index.base("PERSON", originalId);
+      if (base == null) continue;
 
-    // Check modified existing persons
-    Set<UUID> allIds = new HashSet<>();
-    allIds.addAll(mainMap.keySet());
-    allIds.addAll(clonedMap.keySet());
+      boolean oursChanged = ours != null && !personEquals(ours, base);
+      boolean theirsChanged = theirs != null && !personEquals(theirs, base);
+      boolean deletedDifferently = ours == null ^ theirs == null;
 
-    for (UUID id : allIds) {
-      Person main = mainMap.get(id);
-      Person cloned = clonedMap.get(id);
-      boolean inBase = basePersons.containsKey(id);
-
-      if (main != null && cloned != null) {
-        // Both exist — check if both modified from base
-        if (inBase && isPersonModified(main, cloned, basePersons.get(id))) {
-          conflicts.add(new MergeConflict("PERSON", id,
-              main.getFirstName() + " " + main.getLastName(),
-              serializePerson(main), serializePerson(cloned)));
-        }
-      } else if (main != null && cloned == null && inBase) {
-        // Deleted in cloned, still exists in main — conflict if base had it
-        conflicts.add(new MergeConflict("PERSON", id,
-            "Person " + id, "exists", "deleted"));
-      } else if (main == null && cloned != null && inBase) {
-        // Deleted in main, still exists in cloned
-        conflicts.add(new MergeConflict("PERSON", id,
-            "Person " + id, "deleted", "exists"));
+      if ((oursChanged && theirsChanged && !samePerson(ours, theirs)) || (deletedDifferently && (oursChanged || theirsChanged))) {
+        conflicts.add(new MergeConflict("PERSON", originalId, personName(ours, theirs), serialize(ours), serialize(theirs)));
       }
     }
-
     return conflicts;
   }
 
-  private List<MergeConflict> compareRelationships(Version base, FamilyTree mainTree, FamilyTree clonedTree) {
+  private List<MergeConflict> eventConflicts(FamilyTree mainTree, FamilyTree clonedTree, VersionIndex index) {
+    Map<UUID, Event> main = byId(eventRepository.findAllByTreeId(mainTree.getId()));
+    Map<UUID, Event> copy = byId(eventRepository.findAllByTreeId(clonedTree.getId()));
     List<MergeConflict> conflicts = new ArrayList<>();
-    Map<UUID, String> baseRels = base != null ? extractEntityIds(base, "RELATIONSHIP") : Map.of();
-    List<Relationship> mainRels = relationshipRepository.findAllByTreeId(mainTree.getId());
-    List<Relationship> clonedRels = relationshipRepository.findAllByTreeId(clonedTree.getId());
 
-    Map<UUID, Relationship> mainMap = mainRels.stream().collect(Collectors.toMap(Relationship::getId, r -> r));
-    Map<UUID, Relationship> clonedMap = clonedRels.stream().collect(Collectors.toMap(Relationship::getId, r -> r));
+    for (Map.Entry<UUID, UUID> entry : index.originalToClone("EVENT").entrySet()) {
+      UUID originalId = entry.getKey();
+      Event ours = main.get(originalId);
+      Event theirs = copy.get(entry.getValue());
+      JsonNode base = index.base("EVENT", originalId);
+      if (base == null) continue;
 
-    Set<UUID> allIds = new HashSet<>();
-    allIds.addAll(mainMap.keySet());
-    allIds.addAll(clonedMap.keySet());
-
-    for (UUID id : allIds) {
-      Relationship main = mainMap.get(id);
-      Relationship cloned = clonedMap.get(id);
-      boolean inBase = baseRels.containsKey(id);
-
-      if (main != null && cloned != null && inBase) {
-        if (isRelationshipModified(main, cloned, baseRels.get(id))) {
-          conflicts.add(new MergeConflict("RELATIONSHIP", id,
-              main.getType().name(),
-              serializeRelationship(main), serializeRelationship(cloned)));
-        }
-      } else if (main != null && cloned == null && inBase) {
-        conflicts.add(new MergeConflict("RELATIONSHIP", id,
-            "Relationship " + id, "exists", "deleted"));
-      } else if (main == null && cloned != null && inBase) {
-        conflicts.add(new MergeConflict("RELATIONSHIP", id,
-            "Relationship " + id, "deleted", "exists"));
+      boolean oursChanged = ours != null && !eventEquals(ours, base);
+      boolean theirsChanged = theirs != null && !eventEquals(theirs, base);
+      if ((oursChanged && theirsChanged && !sameEvent(ours, theirs)) || ((ours == null ^ theirs == null) && (oursChanged || theirsChanged))) {
+        conflicts.add(new MergeConflict("EVENT", originalId, eventName(ours, theirs), serialize(ours), serialize(theirs)));
       }
     }
-
     return conflicts;
   }
 
-  private List<MergeConflict> compareEvents(Version base, FamilyTree mainTree, FamilyTree clonedTree) {
+  private List<MergeConflict> mediaConflicts(FamilyTree mainTree, FamilyTree clonedTree, VersionIndex index) {
+    Map<UUID, Media> main = byId(mediaRepository.findAllByTreeIdOrderByCreatedAtAsc(mainTree.getId()));
+    Map<UUID, Media> copy = byId(mediaRepository.findAllByTreeIdOrderByCreatedAtAsc(clonedTree.getId()));
     List<MergeConflict> conflicts = new ArrayList<>();
-    Map<UUID, String> baseEvents = base != null ? extractEntityIds(base, "EVENT") : Map.of();
-    List<Event> mainEvents = eventRepository.findAllByTreeId(mainTree.getId());
-    List<Event> clonedEvents = eventRepository.findAllByTreeId(clonedTree.getId());
 
-    Map<UUID, Event> mainMap = mainEvents.stream().collect(Collectors.toMap(Event::getId, e -> e));
-    Map<UUID, Event> clonedMap = clonedEvents.stream().collect(Collectors.toMap(Event::getId, e -> e));
+    for (Map.Entry<UUID, UUID> entry : index.originalToClone("MEDIA").entrySet()) {
+      UUID originalId = entry.getKey();
+      Media ours = main.get(originalId);
+      Media theirs = copy.get(entry.getValue());
+      JsonNode base = index.base("MEDIA", originalId);
+      if (base == null) continue;
 
-    Set<UUID> allIds = new HashSet<>();
-    allIds.addAll(mainMap.keySet());
-    allIds.addAll(clonedMap.keySet());
-
-    for (UUID id : allIds) {
-      Event main = mainMap.get(id);
-      Event cloned = clonedMap.get(id);
-      boolean inBase = baseEvents.containsKey(id);
-
-      if (main != null && cloned != null && inBase) {
-        if (isEventModified(main, cloned, baseEvents.get(id))) {
-          conflicts.add(new MergeConflict("EVENT", id,
-              main.getTitle(), serializeEvent(main), serializeEvent(cloned)));
-        }
-      } else if (main != null && cloned == null && inBase) {
-        conflicts.add(new MergeConflict("EVENT", id,
-            "Event " + id, "exists", "deleted"));
-      } else if (main == null && cloned != null && inBase) {
-        conflicts.add(new MergeConflict("EVENT", id,
-            "Event " + id, "deleted", "exists"));
+      boolean oursChanged = ours != null && !mediaEquals(ours, base);
+      boolean theirsChanged = theirs != null && !mediaEquals(theirs, base);
+      if ((oursChanged && theirsChanged && !sameMedia(ours, theirs)) || ((ours == null ^ theirs == null) && (oursChanged || theirsChanged))) {
+        conflicts.add(new MergeConflict("MEDIA", originalId, mediaName(ours, theirs), serialize(ours), serialize(theirs)));
       }
     }
-
     return conflicts;
   }
 
-  private List<MergeConflict> compareMedia(Version base, FamilyTree mainTree, FamilyTree clonedTree) {
+  private List<MergeConflict> relationshipConflicts(FamilyTree mainTree, FamilyTree clonedTree, VersionIndex index) {
+    Map<UUID, Relationship> main = byId(relationshipRepository.findAllByTreeId(mainTree.getId()));
+    Map<UUID, Relationship> copy = byId(relationshipRepository.findAllByTreeId(clonedTree.getId()));
     List<MergeConflict> conflicts = new ArrayList<>();
-    Map<UUID, String> baseMedia = base != null ? extractEntityIds(base, "MEDIA") : Map.of();
-    List<Media> mainMedia = mediaRepository.findAllByTreeIdOrderByCreatedAtAsc(mainTree.getId());
-    List<Media> clonedMedia = mediaRepository.findAllByTreeIdOrderByCreatedAtAsc(clonedTree.getId());
 
-    Map<UUID, Media> mainMap = mainMedia.stream().collect(Collectors.toMap(Media::getId, m -> m));
-    Map<UUID, Media> clonedMap = clonedMedia.stream().collect(Collectors.toMap(Media::getId, m -> m));
+    for (Map.Entry<UUID, UUID> entry : index.originalToClone("RELATIONSHIP").entrySet()) {
+      UUID originalId = entry.getKey();
+      Relationship ours = main.get(originalId);
+      Relationship theirs = copy.get(entry.getValue());
+      JsonNode base = index.base("RELATIONSHIP", originalId);
+      if (base == null) continue;
 
-    Set<UUID> allIds = new HashSet<>();
-    allIds.addAll(mainMap.keySet());
-    allIds.addAll(clonedMap.keySet());
-
-    for (UUID id : allIds) {
-      Media main = mainMap.get(id);
-      Media cloned = clonedMap.get(id);
-      boolean inBase = baseMedia.containsKey(id);
-
-      if (main != null && cloned != null && inBase) {
-        if (isMediaModified(main, cloned, baseMedia.get(id))) {
-          conflicts.add(new MergeConflict("MEDIA", id,
-              main.getFileName(), serializeMedia(main), serializeMedia(cloned)));
-        }
-      } else if (main != null && cloned == null && inBase) {
-        conflicts.add(new MergeConflict("MEDIA", id,
-            "Media " + id, "exists", "deleted"));
-      } else if (main == null && cloned != null && inBase) {
-        conflicts.add(new MergeConflict("MEDIA", id,
-            "Media " + id, "deleted", "exists"));
+      boolean oursChanged = ours != null && !relationshipEquals(ours, base);
+      boolean theirsChanged = theirs != null && !relationshipEquals(theirs, base);
+      if ((oursChanged && theirsChanged && !sameRelationship(ours, theirs, index)) || ((ours == null ^ theirs == null) && (oursChanged || theirsChanged))) {
+        conflicts.add(new MergeConflict("RELATIONSHIP", originalId, relationshipName(ours, theirs), serialize(ours, index), serialize(theirs, index)));
       }
     }
-
     return conflicts;
   }
 
-  // ─── Conflict resolution ───────────────────────────────────────────────────
+  private void mergePersons(FamilyTree mainTree, FamilyTree clonedTree, VersionIndex index) {
+    Map<UUID, Person> main = byId(personRepository.findAllByTreeId(mainTree.getId()));
+    Map<UUID, Person> copy = byId(personRepository.findAllByTreeId(clonedTree.getId()));
+    Set<UUID> mappedClones = new HashSet<>(index.originalToClone("PERSON").values());
 
-  private void applyPersonResolution(FamilyTree mainTree, FamilyTree clonedTree, UUID entityId, boolean ours) {
-    if (ours) {
-      // Keep main tree version — no changes needed
-      return;
-    }
-    // THEIRS: apply cloned changes to main
-    personRepository.findById(entityId).ifPresent(main -> {
-      personRepository.findAllByTreeId(clonedTree.getId()).stream()
-          .filter(p -> p.getId().equals(entityId))
-          .findFirst()
-          .ifPresent(cloned -> applyPersonChanges(main, cloned));
-    });
-  }
+    for (Map.Entry<UUID, UUID> entry : index.originalToClone("PERSON").entrySet()) {
+      Person ours = main.get(entry.getKey());
+      Person theirs = copy.get(entry.getValue());
+      JsonNode base = index.base("PERSON", entry.getKey());
+      if (base == null) continue;
 
-  private void applyRelationshipResolution(FamilyTree mainTree, FamilyTree clonedTree, UUID entityId, boolean ours) {
-    // Same logic: OURS = keep main as-is, THEIRS = apply cloned to main
-    if (!ours) {
-      relationshipRepository.findById(entityId).ifPresent(main -> {
-        relationshipRepository.findAllByTreeId(clonedTree.getId()).stream()
-            .filter(r -> r.getId().equals(entityId))
-            .findFirst()
-            .ifPresent(cloned -> {
-              // Relationship is immutable — delete and recreate
-              relationshipRepository.delete(main);
-              relationshipRepository.save(new Relationship(mainTree, cloned.getFromPerson(), cloned.getToPerson(), cloned.getType()));
-            });
-      });
-    }
-  }
-
-  private void applyEventResolution(FamilyTree mainTree, FamilyTree clonedTree, UUID entityId, boolean ours) {
-    if (!ours) {
-      eventRepository.findById(entityId).ifPresent(main -> {
-        eventRepository.findAllByTreeId(clonedTree.getId()).stream()
-            .filter(e -> e.getId().equals(entityId))
-            .findFirst()
-            .ifPresent(cloned -> {
-              main.setType(cloned.getType());
-              main.setTitle(cloned.getTitle());
-              main.setDateFrom(cloned.getDateFrom());
-              main.setDateTo(cloned.getDateTo());
-            });
-      });
-    }
-  }
-
-  private void applyMediaResolution(FamilyTree mainTree, FamilyTree clonedTree, UUID entityId, boolean ours) {
-    if (!ours) {
-      mediaRepository.findById(entityId).ifPresent(main -> {
-        mediaRepository.findAllByTreeIdOrderByCreatedAtAsc(clonedTree.getId()).stream()
-            .filter(m -> m.getId().equals(entityId))
-            .findFirst()
-            .ifPresent(cloned -> {
-              main.setDescription(cloned.getDescription());
-            });
-      });
-    }
-  }
-
-  // ─── Auto-merge ────────────────────────────────────────────────────────────
-
-  private void mergePersons(Version base, FamilyTree mainTree, FamilyTree clonedTree) {
-    Map<UUID, String> basePersons = base != null ? extractEntityIds(base, "PERSON") : Map.of();
-    List<Person> mainPersons = personRepository.findAllByTreeId(mainTree.getId());
-    List<Person> clonedPersons = personRepository.findAllByTreeId(clonedTree.getId());
-
-    Map<UUID, Person> mainMap = mainPersons.stream().collect(Collectors.toMap(Person::getId, p -> p));
-    Map<UUID, Person> clonedMap = clonedPersons.stream().collect(Collectors.toMap(Person::getId, p -> p));
-
-    Set<UUID> allIds = new HashSet<>();
-    allIds.addAll(mainMap.keySet());
-    allIds.addAll(clonedMap.keySet());
-
-    for (UUID id : allIds) {
-      Person main = mainMap.get(id);
-      Person cloned = clonedMap.get(id);
-      boolean inBase = basePersons.containsKey(id);
-
-      if (main != null && cloned != null) {
-        if (inBase) {
-          // Check if only one side modified
-          boolean mainModified = isPersonModifiedFromBase(main, basePersons.get(id));
-          boolean clonedModified = isPersonModifiedFromBase(cloned, basePersons.get(id));
-          if (clonedModified && !mainModified) {
-            // Only cloned changed → apply to main
-            applyPersonChanges(main, cloned);
-          }
-          // If both modified → conflict (skip, user must resolve)
-          // If neither → no change
-        }
-        // If not in base (new in both with same ID) — shouldn't happen with cloned trees
+      boolean oursChanged = ours != null && !personEquals(ours, base);
+      boolean theirsChanged = theirs != null && !personEquals(theirs, base);
+      if (ours != null && theirs != null && theirsChanged && !oursChanged) {
+        copyPersonFields(ours, theirs);
+      } else if (ours != null && theirs == null && !oursChanged) {
+        personRepository.delete(ours);
       }
-      // New in cloned only, deleted in main — skip (conflict territory)
-      // Deleted in cloned, exists in main — skip (conflict territory)
     }
-  }
 
-  private void mergeRelationships(Version base, FamilyTree mainTree, FamilyTree clonedTree) {
-    Map<UUID, String> baseRels = base != null ? extractEntityIds(base, "RELATIONSHIP") : Map.of();
-    List<Relationship> mainRels = relationshipRepository.findAllByTreeId(mainTree.getId());
-    List<Relationship> clonedRels = relationshipRepository.findAllByTreeId(clonedTree.getId());
-
-    Map<UUID, Relationship> mainMap = mainRels.stream().collect(Collectors.toMap(Relationship::getId, r -> r));
-    Map<UUID, Relationship> clonedMap = clonedRels.stream().collect(Collectors.toMap(Relationship::getId, r -> r));
-
-    Set<UUID> allIds = new HashSet<>();
-    allIds.addAll(mainMap.keySet());
-    allIds.addAll(clonedMap.keySet());
-
-    for (UUID id : allIds) {
-      Relationship main = mainMap.get(id);
-      Relationship cloned = clonedMap.get(id);
-      boolean inBase = baseRels.containsKey(id);
-
-      if (main != null && cloned != null && inBase) {
-        boolean clonedModified = isRelationshipModifiedFromBase(cloned, baseRels.get(id));
-        boolean mainModified = isRelationshipModifiedFromBase(main, baseRels.get(id));
-        if (clonedModified && !mainModified) {
-          // Apply cloned changes
-          relationshipRepository.delete(main);
-          relationshipRepository.save(new Relationship(mainTree, cloned.getFromPerson(), cloned.getToPerson(), cloned.getType()));
-        }
+    for (Person theirs : copy.values()) {
+      if (!mappedClones.contains(theirs.getId())) {
+        Person created = clonePerson(mainTree, theirs);
+        personRepository.save(created);
+        index.remapClone("PERSON", theirs.getId(), created.getId());
       }
     }
   }
 
-  private void mergeEvents(Version base, FamilyTree mainTree, FamilyTree clonedTree) {
-    Map<UUID, String> baseEvents = base != null ? extractEntityIds(base, "EVENT") : Map.of();
-    List<Event> mainEvents = eventRepository.findAllByTreeId(mainTree.getId());
-    List<Event> clonedEvents = eventRepository.findAllByTreeId(clonedTree.getId());
+  private void mergeEvents(FamilyTree mainTree, FamilyTree clonedTree, VersionIndex index) {
+    Map<UUID, Event> main = byId(eventRepository.findAllByTreeId(mainTree.getId()));
+    Map<UUID, Event> copy = byId(eventRepository.findAllByTreeId(clonedTree.getId()));
+    Set<UUID> mappedClones = new HashSet<>(index.originalToClone("EVENT").values());
 
-    Map<UUID, Event> mainMap = mainEvents.stream().collect(Collectors.toMap(Event::getId, e -> e));
-    Map<UUID, Event> clonedMap = clonedEvents.stream().collect(Collectors.toMap(Event::getId, e -> e));
+    for (Map.Entry<UUID, UUID> entry : index.originalToClone("EVENT").entrySet()) {
+      Event ours = main.get(entry.getKey());
+      Event theirs = copy.get(entry.getValue());
+      JsonNode base = index.base("EVENT", entry.getKey());
+      if (base == null) continue;
 
-    Set<UUID> allIds = new HashSet<>();
-    allIds.addAll(mainMap.keySet());
-    allIds.addAll(clonedMap.keySet());
+      boolean oursChanged = ours != null && !eventEquals(ours, base);
+      boolean theirsChanged = theirs != null && !eventEquals(theirs, base);
+      if (ours != null && theirs != null && theirsChanged && !oursChanged) {
+        copyEventFields(ours, theirs);
+      } else if (ours != null && theirs == null && !oursChanged) {
+        eventPersonRepository.deleteAllByEvent(ours);
+        eventRepository.delete(ours);
+      }
+    }
 
-    for (UUID id : allIds) {
-      Event main = mainMap.get(id);
-      Event cloned = clonedMap.get(id);
-      boolean inBase = baseEvents.containsKey(id);
-
-      if (main != null && cloned != null && inBase) {
-        boolean clonedModified = isEventModifiedFromBase(cloned, baseEvents.get(id));
-        boolean mainModified = isEventModifiedFromBase(main, baseEvents.get(id));
-        if (clonedModified && !mainModified) {
-          main.setType(cloned.getType());
-          main.setTitle(cloned.getTitle());
-          main.setDateFrom(cloned.getDateFrom());
-          main.setDateTo(cloned.getDateTo());
-        }
+    for (Event theirs : copy.values()) {
+      if (!mappedClones.contains(theirs.getId())) {
+        Event created = cloneEvent(mainTree, theirs);
+        eventRepository.save(created);
+        index.remapClone("EVENT", theirs.getId(), created.getId());
+        cloneEventPersons(theirs, created, index);
       }
     }
   }
 
-  private void mergeMedia(Version base, FamilyTree mainTree, FamilyTree clonedTree) {
-    Map<UUID, String> baseMedia = base != null ? extractEntityIds(base, "MEDIA") : Map.of();
-    List<Media> mainMedia = mediaRepository.findAllByTreeIdOrderByCreatedAtAsc(mainTree.getId());
-    List<Media> clonedMedia = mediaRepository.findAllByTreeIdOrderByCreatedAtAsc(clonedTree.getId());
+  private void mergeMedia(FamilyTree mainTree, FamilyTree clonedTree, VersionIndex index) {
+    Map<UUID, Media> main = byId(mediaRepository.findAllByTreeIdOrderByCreatedAtAsc(mainTree.getId()));
+    Map<UUID, Media> copy = byId(mediaRepository.findAllByTreeIdOrderByCreatedAtAsc(clonedTree.getId()));
+    Set<UUID> mappedClones = new HashSet<>(index.originalToClone("MEDIA").values());
 
-    Map<UUID, Media> mainMap = mainMedia.stream().collect(Collectors.toMap(Media::getId, m -> m));
-    Map<UUID, Media> clonedMap = clonedMedia.stream().collect(Collectors.toMap(Media::getId, m -> m));
+    for (Map.Entry<UUID, UUID> entry : index.originalToClone("MEDIA").entrySet()) {
+      Media ours = main.get(entry.getKey());
+      Media theirs = copy.get(entry.getValue());
+      JsonNode base = index.base("MEDIA", entry.getKey());
+      if (base == null) continue;
 
-    Set<UUID> allIds = new HashSet<>();
-    allIds.addAll(mainMap.keySet());
-    allIds.addAll(clonedMap.keySet());
+      boolean oursChanged = ours != null && !mediaEquals(ours, base);
+      boolean theirsChanged = theirs != null && !mediaEquals(theirs, base);
+      if (ours != null && theirs != null && theirsChanged && !oursChanged) {
+        ours.setDescription(theirs.getDescription());
+      } else if (ours != null && theirs == null && !oursChanged) {
+        mediaRepository.delete(ours);
+      }
+    }
 
-    for (UUID id : allIds) {
-      Media main = mainMap.get(id);
-      Media cloned = clonedMap.get(id);
-      boolean inBase = baseMedia.containsKey(id);
-
-      if (main != null && cloned != null && inBase) {
-        boolean clonedModified = isMediaModifiedFromBase(cloned, baseMedia.get(id));
-        boolean mainModified = isMediaModifiedFromBase(main, baseMedia.get(id));
-        if (clonedModified && !mainModified) {
-          main.setDescription(cloned.getDescription());
-        }
+    for (Media theirs : copy.values()) {
+      if (!mappedClones.contains(theirs.getId())) {
+        mediaRepository.save(cloneMedia(mainTree, theirs, index));
       }
     }
   }
 
-  // ─── Helpers ───────────────────────────────────────────────────────────────
+  private void mergeRelationships(FamilyTree mainTree, FamilyTree clonedTree, VersionIndex index) {
+    Map<UUID, Relationship> main = byId(relationshipRepository.findAllByTreeId(mainTree.getId()));
+    Map<UUID, Relationship> copy = byId(relationshipRepository.findAllByTreeId(clonedTree.getId()));
+    Set<UUID> mappedClones = new HashSet<>(index.originalToClone("RELATIONSHIP").values());
 
-  private Map<UUID, String> extractEntityIds(Version version, String entityType) {
-    Map<UUID, String> result = new HashMap<>();
-    List<VersionEntity> entities = versionEntityRepository.findAllByVersionIdAndEntityType(version.getId(), entityType);
-    for (VersionEntity ve : entities) {
-      result.put(ve.getEntityId(), ve.getEntityData());
+    for (Map.Entry<UUID, UUID> entry : index.originalToClone("RELATIONSHIP").entrySet()) {
+      Relationship ours = main.get(entry.getKey());
+      Relationship theirs = copy.get(entry.getValue());
+      JsonNode base = index.base("RELATIONSHIP", entry.getKey());
+      if (base == null) continue;
+
+      boolean oursChanged = ours != null && !relationshipEquals(ours, base);
+      boolean theirsChanged = theirs != null && !relationshipEquals(theirs, base);
+      if (ours != null && theirs != null && theirsChanged && !oursChanged) {
+        relationshipRepository.delete(ours);
+        relationshipRepository.save(cloneRelationship(mainTree, theirs, index));
+      } else if (ours != null && theirs == null && !oursChanged) {
+        relationshipRepository.delete(ours);
+      }
     }
-    return result;
-  }
 
-  private boolean isPersonModified(Person main, Person cloned, String baseJson) {
-    try {
-      JsonNode base = objectMapper.readTree(baseJson);
-      return !personDataEqual(main, base) || !personDataEqual(cloned, base);
-    } catch (Exception e) {
-      return true;
-    }
-  }
-
-  private boolean isPersonModifiedFromBase(Person person, String baseJson) {
-    try {
-      JsonNode base = objectMapper.readTree(baseJson);
-      return !personDataEqual(person, base);
-    } catch (Exception e) {
-      return true;
-    }
-  }
-
-  private boolean personDataEqual(Person person, JsonNode base) {
-    String first = person.getFirstName() != null ? person.getFirstName() : "";
-    String last = person.getLastName() != null ? person.getLastName() : "";
-    String gender = person.getGender() != null ? person.getGender() : "";
-    String birthPlace = person.getBirthPlace() != null ? person.getBirthPlace() : "";
-    String deathPlace = person.getDeathPlace() != null ? person.getDeathPlace() : "";
-    String bio = person.getBio() != null ? person.getBio() : "";
-    String photoUrl = person.getPhotoUrl() != null ? person.getPhotoUrl() : "";
-
-    return first.equals(base.path("firstName").asText(""))
-        && last.equals(base.path("lastName").asText(""))
-        && gender.equals(base.path("gender").asText(""))
-        && birthPlace.equals(base.path("birthPlace").asText(""))
-        && deathPlace.equals(base.path("deathPlace").asText(""))
-        && bio.equals(base.path("bio").asText(""))
-        && photoUrl.equals(base.path("photoUrl").asText(""));
-  }
-
-  private boolean isRelationshipModified(Relationship main, Relationship cloned, String baseJson) {
-    try {
-      JsonNode base = objectMapper.readTree(baseJson);
-      return !main.getType().name().equals(base.path("type").asText());
-    } catch (Exception e) {
-      return true;
+    for (Relationship theirs : copy.values()) {
+      if (!mappedClones.contains(theirs.getId())) {
+        relationshipRepository.save(cloneRelationship(mainTree, theirs, index));
+      }
     }
   }
 
-  private boolean isRelationshipModifiedFromBase(Relationship rel, String baseJson) {
-    try {
-      JsonNode base = objectMapper.readTree(baseJson);
-      return !rel.getType().name().equals(base.path("type").asText());
-    } catch (Exception e) {
-      return true;
+  private void applyPersonFromCopy(FamilyTree mainTree, FamilyTree clonedTree, UUID originalId, VersionIndex index) {
+    Person ours = personRepository.findById(originalId).orElse(null);
+    Person theirs = personRepository.findById(index.cloneId("PERSON", originalId)).orElse(null);
+    if (ours != null && theirs != null) copyPersonFields(ours, theirs);
+    if (ours == null && theirs != null) personRepository.save(clonePerson(mainTree, theirs));
+    if (ours != null && theirs == null) personRepository.delete(ours);
+  }
+
+  private void applyEventFromCopy(FamilyTree mainTree, FamilyTree clonedTree, UUID originalId, VersionIndex index) {
+    Event ours = eventRepository.findById(originalId).orElse(null);
+    Event theirs = eventRepository.findById(index.cloneId("EVENT", originalId)).orElse(null);
+    if (ours != null && theirs != null) copyEventFields(ours, theirs);
+    if (ours == null && theirs != null) eventRepository.save(cloneEvent(mainTree, theirs));
+    if (ours != null && theirs == null) {
+      eventPersonRepository.deleteAllByEvent(ours);
+      eventRepository.delete(ours);
     }
   }
 
-  private boolean isEventModified(Event main, Event cloned, String baseJson) {
-    try {
-      JsonNode base = objectMapper.readTree(baseJson);
-      return !main.getTitle().equals(base.path("title").asText())
-          || !main.getType().name().equals(base.path("type").asText());
-    } catch (Exception e) {
-      return true;
+  private void applyMediaFromCopy(FamilyTree mainTree, FamilyTree clonedTree, UUID originalId, VersionIndex index) {
+    Media ours = mediaRepository.findById(originalId).orElse(null);
+    Media theirs = mediaRepository.findById(index.cloneId("MEDIA", originalId)).orElse(null);
+    if (ours != null && theirs != null) ours.setDescription(theirs.getDescription());
+    if (ours == null && theirs != null) mediaRepository.save(cloneMedia(mainTree, theirs, index));
+    if (ours != null && theirs == null) mediaRepository.delete(ours);
+  }
+
+  private void applyRelationshipFromCopy(FamilyTree mainTree, FamilyTree clonedTree, UUID originalId, VersionIndex index) {
+    Relationship ours = relationshipRepository.findById(originalId).orElse(null);
+    Relationship theirs = relationshipRepository.findById(index.cloneId("RELATIONSHIP", originalId)).orElse(null);
+    if (ours != null) relationshipRepository.delete(ours);
+    if (theirs != null) relationshipRepository.save(cloneRelationship(mainTree, theirs, index));
+  }
+
+  private Person clonePerson(FamilyTree tree, Person source) {
+    Person p = new Person(tree, source.getFirstName(), source.getLastName(), source.getGender(), source.getBirthDate(), source.getDeathDate());
+    copyPersonFields(p, source);
+    return p;
+  }
+
+  private Event cloneEvent(FamilyTree tree, Event source) {
+    return new Event(tree, source.getType(), source.getTitle(), source.getDateFrom(), source.getDateTo());
+  }
+
+  private Media cloneMedia(FamilyTree tree, Media source, VersionIndex index) {
+    Person person = source.getPerson() != null
+        ? personRepository.findById(index.mainIdForClone("PERSON", source.getPerson().getId())).orElse(null)
+        : null;
+    Event event = source.getEvent() != null
+        ? eventRepository.findById(index.mainIdForClone("EVENT", source.getEvent().getId())).orElse(null)
+        : null;
+    if (event != null) {
+      return new Media(tree, event, source.getUrl(), source.getDescription(), source.getMimeType(), source.getFileName());
+    }
+    return new Media(tree, person, source.getUrl(), source.getDescription(), source.getMimeType(), source.getFileName());
+  }
+
+  private Relationship cloneRelationship(FamilyTree tree, Relationship source, VersionIndex index) {
+    Person from = personRepository.findById(index.mainIdForClone("PERSON", source.getFromPerson().getId()))
+        .orElseThrow(() -> new NotFoundException("Merged relationship person not found"));
+    Person to = personRepository.findById(index.mainIdForClone("PERSON", source.getToPerson().getId()))
+        .orElseThrow(() -> new NotFoundException("Merged relationship person not found"));
+    return new Relationship(tree, from, to, source.getType());
+  }
+
+  private void cloneEventPersons(Event source, Event target, VersionIndex index) {
+    for (EventPerson ep : eventPersonRepository.findAllByEvent(source)) {
+      personRepository.findById(index.mainIdForClone("PERSON", ep.getPerson().getId()))
+          .ifPresent(person -> eventPersonRepository.save(new EventPerson(target, person)));
     }
   }
 
-  private boolean isEventModifiedFromBase(Event event, String baseJson) {
-    try {
-      JsonNode base = objectMapper.readTree(baseJson);
-      return !event.getTitle().equals(base.path("title").asText())
-          || !event.getType().name().equals(base.path("type").asText());
-    } catch (Exception ex) {
-      return true;
-    }
-  }
-
-  private boolean isMediaModified(Media main, Media cloned, String baseJson) {
-    try {
-      JsonNode base = objectMapper.readTree(baseJson);
-      return !main.getUrl().equals(base.path("url").asText())
-          || !main.getFileName().equals(base.path("fileName").asText());
-    } catch (Exception e) {
-      return true;
-    }
-  }
-
-  private boolean isMediaModifiedFromBase(Media media, String baseJson) {
-    try {
-      JsonNode base = objectMapper.readTree(baseJson);
-      return !media.getUrl().equals(base.path("url").asText())
-          || !media.getFileName().equals(base.path("fileName").asText());
-    } catch (Exception e) {
-      return true;
-    }
-  }
-
-  private void applyPersonChanges(Person target, Person source) {
+  private void copyPersonFields(Person target, Person source) {
     target.setFirstName(source.getFirstName());
     target.setLastName(source.getLastName());
     target.setGender(source.getGender());
@@ -601,62 +429,152 @@ public class MergeService {
     target.setPhotoUrl(source.getPhotoUrl());
   }
 
-  private String serializePerson(Person p) {
-    try {
-      return objectMapper.writeValueAsString(Map.of(
-          "firstName", p.getFirstName(),
-          "lastName", p.getLastName(),
-          "gender", p.getGender(),
-          "birthDate", p.getBirthDate(),
-          "deathDate", p.getDeathDate()
-      ));
-    } catch (Exception e) {
-      return "{}";
-    }
+  private void copyEventFields(Event target, Event source) {
+    target.setType(source.getType());
+    target.setTitle(source.getTitle());
+    target.setDateFrom(source.getDateFrom());
+    target.setDateTo(source.getDateTo());
   }
 
-  private String serializeRelationship(Relationship r) {
+  private boolean personEquals(Person person, JsonNode base) {
+    return Objects.equals(person.getFirstName(), textOrNull(base, "firstName"))
+        && Objects.equals(person.getLastName(), textOrNull(base, "lastName"))
+        && Objects.equals(person.getGender(), textOrNull(base, "gender"))
+        && Objects.equals(person.getBirthPlace(), textOrNull(base, "birthPlace"))
+        && Objects.equals(person.getDeathPlace(), textOrNull(base, "deathPlace"))
+        && Objects.equals(person.getBio(), textOrNull(base, "bio"))
+        && Objects.equals(person.getPhotoUrl(), textOrNull(base, "photoUrl"));
+  }
+
+  private boolean eventEquals(Event event, JsonNode base) {
+    return Objects.equals(event.getTitle(), textOrNull(base, "title"))
+        && Objects.equals(event.getType() != null ? event.getType().name() : null, textOrNull(base, "type"));
+  }
+
+  private boolean mediaEquals(Media media, JsonNode base) {
+    return Objects.equals(media.getUrl(), textOrNull(base, "url"))
+        && Objects.equals(media.getFileName(), textOrNull(base, "fileName"))
+        && Objects.equals(media.getDescription(), textOrNull(base, "description"));
+  }
+
+  private boolean relationshipEquals(Relationship rel, JsonNode base) {
+    return Objects.equals(rel.getType() != null ? rel.getType().name() : null, textOrNull(base, "type"));
+  }
+
+  private boolean samePerson(Person a, Person b) {
+    if (a == null || b == null) return a == b;
+    return Objects.equals(a.getFirstName(), b.getFirstName())
+        && Objects.equals(a.getLastName(), b.getLastName())
+        && Objects.equals(a.getGender(), b.getGender())
+        && Objects.equals(a.getBirthDate(), b.getBirthDate())
+        && Objects.equals(a.getDeathDate(), b.getDeathDate())
+        && Objects.equals(a.getBirthPlace(), b.getBirthPlace())
+        && Objects.equals(a.getDeathPlace(), b.getDeathPlace())
+        && Objects.equals(a.getBio(), b.getBio())
+        && Objects.equals(a.getPhotoUrl(), b.getPhotoUrl());
+  }
+
+  private boolean sameEvent(Event a, Event b) {
+    if (a == null || b == null) return a == b;
+    return Objects.equals(a.getTitle(), b.getTitle())
+        && Objects.equals(a.getType(), b.getType())
+        && Objects.equals(a.getDateFrom(), b.getDateFrom())
+        && Objects.equals(a.getDateTo(), b.getDateTo());
+  }
+
+  private boolean sameMedia(Media a, Media b) {
+    if (a == null || b == null) return a == b;
+    return Objects.equals(a.getUrl(), b.getUrl())
+        && Objects.equals(a.getFileName(), b.getFileName())
+        && Objects.equals(a.getMimeType(), b.getMimeType())
+        && Objects.equals(a.getDescription(), b.getDescription());
+  }
+
+  private boolean sameRelationship(Relationship a, Relationship b, VersionIndex index) {
+    if (a == null || b == null) return a == b;
+    return Objects.equals(a.getType(), b.getType())
+        && Objects.equals(a.getFromPerson().getId(), index.mainIdForClone("PERSON", b.getFromPerson().getId()))
+        && Objects.equals(a.getToPerson().getId(), index.mainIdForClone("PERSON", b.getToPerson().getId()));
+  }
+
+  private String textOrNull(JsonNode node, String field) {
+    JsonNode value = node.path(field);
+    return value.isMissingNode() || value.isNull() ? null : value.asText();
+  }
+
+  private String personName(Person ours, Person theirs) {
+    Person p = ours != null ? ours : theirs;
+    return p == null ? "Персона" : ((p.getFirstName() != null ? p.getFirstName() : "") + " " + (p.getLastName() != null ? p.getLastName() : "")).trim();
+  }
+
+  private String eventName(Event ours, Event theirs) {
+    Event e = ours != null ? ours : theirs;
+    return e != null && e.getTitle() != null ? e.getTitle() : "Событие";
+  }
+
+  private String mediaName(Media ours, Media theirs) {
+    Media m = ours != null ? ours : theirs;
+    return m != null && m.getFileName() != null ? m.getFileName() : "Медиа";
+  }
+
+  private String relationshipName(Relationship ours, Relationship theirs) {
+    Relationship r = ours != null ? ours : theirs;
+    return r != null && r.getType() != null ? r.getType().name() : "Связь";
+  }
+
+  private String serialize(Object value) {
+    if (value == null) return "null";
     try {
-      return objectMapper.writeValueAsString(Map.of(
-          "type", r.getType().name()
-      ));
+      Map<String, Object> data = new HashMap<>();
+      if (value instanceof Person p) {
+        data.put("firstName", p.getFirstName());
+        data.put("lastName", p.getLastName());
+        data.put("gender", p.getGender());
+        data.put("birthDate", p.getBirthDate());
+        data.put("deathDate", p.getDeathDate());
+        data.put("birthPlace", p.getBirthPlace());
+        data.put("deathPlace", p.getDeathPlace());
+        data.put("bio", p.getBio());
+      } else if (value instanceof Event e) {
+        data.put("title", e.getTitle());
+        data.put("type", e.getType());
+        data.put("dateFrom", e.getDateFrom());
+        data.put("dateTo", e.getDateTo());
+      } else if (value instanceof Media m) {
+        data.put("fileName", m.getFileName());
+        data.put("description", m.getDescription());
+        data.put("url", m.getUrl());
+      }
+      return objectMapper.writeValueAsString(data);
     } catch (Exception ex) {
       return "{}";
     }
   }
 
-  private String serializeEvent(Event evt) {
+  private String serialize(Relationship relationship, VersionIndex index) {
+    if (relationship == null) return "null";
     try {
-      return objectMapper.writeValueAsString(Map.of(
-          "title", evt.getTitle(),
-          "type", evt.getType(),
-          "dateFrom", evt.getDateFrom(),
-          "dateTo", evt.getDateTo()
-      ));
+      Map<String, Object> data = new HashMap<>();
+      data.put("type", relationship.getType());
+      data.put("fromPersonId", relationship.getFromPerson() != null ? index.mainIdForClone("PERSON", relationship.getFromPerson().getId()) : null);
+      data.put("toPersonId", relationship.getToPerson() != null ? index.mainIdForClone("PERSON", relationship.getToPerson().getId()) : null);
+      return objectMapper.writeValueAsString(data);
     } catch (Exception ex) {
       return "{}";
     }
   }
 
-  private String serializeMedia(Media m) {
-    try {
-      return objectMapper.writeValueAsString(Map.of(
-          "url", m.getUrl(),
-          "fileName", m.getFileName(),
-          "description", m.getDescription()
-      ));
-    } catch (Exception e) {
-      return "{}";
-    }
+  private <T extends com.example.backend.shared.entity.BaseEntity> Map<UUID, T> byId(List<T> entities) {
+    return entities.stream().collect(Collectors.toMap(com.example.backend.shared.entity.BaseEntity::getId, Function.identity()));
   }
 
   private Version resolveWorkingCopy(UUID treeId, UUID versionId) {
     Version wc = versionRepository.findByIdAndTreeId(versionId, treeId)
         .orElseThrow(() -> new NotFoundException("Version not found"));
-    if (wc.getType() != com.example.backend.version.entity.VersionType.WORKING_COPY) {
+    if (wc.getType() != VersionType.WORKING_COPY) {
       throw new IllegalStateException("Can only merge working copies");
     }
-    if (wc.getState() != com.example.backend.version.entity.VersionState.ACTIVE) {
+    if (wc.getState() != VersionState.ACTIVE) {
       throw new IllegalStateException("Working copy is not active");
     }
     if (wc.getClonedTreeId() == null) {
@@ -665,9 +583,9 @@ public class MergeService {
     return wc;
   }
 
-  private Version findBaseSnapshot(Version wc) {
-    if (wc.getBaseSnapshotId() == null) return null;
-    return versionRepository.findById(wc.getBaseSnapshotId()).orElse(null);
+  private FamilyTree resolveClonedTree(Version wc) {
+    return treeRepository.findById(wc.getClonedTreeId())
+        .orElseThrow(() -> new NotFoundException("Cloned tree not found"));
   }
 
   private TreeMember resolveMember(UUID treeId) {
@@ -680,9 +598,68 @@ public class MergeService {
 
   private VersionResponse toResponse(Version v) {
     int count = versionEntityRepository.findAllByVersionId(v.getId()).size();
-    return new VersionResponse(
+    VersionResponse resp = new VersionResponse(
         v.getId(), v.getName(), v.getDescription(), v.getType().name(),
         v.getState().name(), v.getParentId(), v.getBaseSnapshotId(),
         v.getCreatedAt(), v.getCreatedBy() != null ? v.getCreatedBy().getEmail() : null, count);
+    resp.setClonedTreeId(v.getClonedTreeId());
+    return resp;
+  }
+
+  private static class VersionIndex {
+    private final Map<String, Map<UUID, JsonNode>> baseByType;
+    private final Map<String, Map<UUID, UUID>> originalToCloneByType;
+    private final Map<String, Map<UUID, UUID>> cloneToOriginalByType;
+
+    private VersionIndex(
+        Map<String, Map<UUID, JsonNode>> baseByType,
+        Map<String, Map<UUID, UUID>> originalToCloneByType,
+        Map<String, Map<UUID, UUID>> cloneToOriginalByType
+    ) {
+      this.baseByType = baseByType;
+      this.originalToCloneByType = originalToCloneByType;
+      this.cloneToOriginalByType = cloneToOriginalByType;
+    }
+
+    static VersionIndex of(Version version, VersionEntityRepository repository, ObjectMapper mapper) {
+      Map<String, Map<UUID, JsonNode>> bases = new HashMap<>();
+      Map<String, Map<UUID, UUID>> originalToClone = new HashMap<>();
+      Map<String, Map<UUID, UUID>> cloneToOriginal = new HashMap<>();
+
+      for (VersionEntity entity : repository.findAllByVersionId(version.getId())) {
+        if (entity.getEntityData() == null) continue;
+        try {
+          JsonNode data = mapper.readTree(entity.getEntityData());
+          UUID originalId = entity.getEntityId();
+          UUID cloneId = data.hasNonNull("clonedId") ? UUID.fromString(data.get("clonedId").asText()) : originalId;
+          bases.computeIfAbsent(entity.getEntityType(), key -> new HashMap<>()).put(originalId, data);
+          originalToClone.computeIfAbsent(entity.getEntityType(), key -> new HashMap<>()).put(originalId, cloneId);
+          cloneToOriginal.computeIfAbsent(entity.getEntityType(), key -> new HashMap<>()).put(cloneId, originalId);
+        } catch (Exception ignored) {
+        }
+      }
+
+      return new VersionIndex(bases, originalToClone, cloneToOriginal);
+    }
+
+    JsonNode base(String type, UUID originalId) {
+      return baseByType.getOrDefault(type, Map.of()).get(originalId);
+    }
+
+    UUID cloneId(String type, UUID originalId) {
+      return originalToClone(type).get(originalId);
+    }
+
+    UUID mainIdForClone(String type, UUID cloneId) {
+      return cloneToOriginalByType.getOrDefault(type, Map.of()).getOrDefault(cloneId, cloneId);
+    }
+
+    Map<UUID, UUID> originalToClone(String type) {
+      return originalToCloneByType.getOrDefault(type, Map.of());
+    }
+
+    void remapClone(String type, UUID cloneId, UUID mainId) {
+      cloneToOriginalByType.computeIfAbsent(type, key -> new HashMap<>()).put(cloneId, mainId);
+    }
   }
 }

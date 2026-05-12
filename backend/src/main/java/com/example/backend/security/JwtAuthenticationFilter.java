@@ -44,7 +44,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         User user = userRepository.findById(userId).orElse(null);
 
-        if (user != null) {
+        if (user != null && user.isEmailVerified()) {
           UsernamePasswordAuthenticationToken authentication =
               new UsernamePasswordAuthenticationToken(
                   user,

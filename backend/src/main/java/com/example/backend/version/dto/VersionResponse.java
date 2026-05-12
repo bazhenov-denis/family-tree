@@ -15,6 +15,7 @@ public class VersionResponse {
   private Instant createdAt;
   private String createdBy;
   private int entityCount;
+  private UUID clonedTreeId;
 
   public VersionResponse(UUID id, String name, String description, String type, String state,
                          UUID parentId, UUID baseSnapshotId, Instant createdAt, String createdBy, int entityCount) {
@@ -40,4 +41,6 @@ public class VersionResponse {
   public Instant getCreatedAt() { return createdAt; }
   public String getCreatedBy() { return createdBy; }
   public int getEntityCount() { return entityCount; }
+  public UUID getClonedTreeId() { return clonedTreeId; }
+  public void setClonedTreeId(UUID clonedTreeId) { this.clonedTreeId = clonedTreeId; }
 }
